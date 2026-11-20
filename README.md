@@ -9,7 +9,7 @@
 - Funziona **offline** (cache locale + service worker) e si sincronizza da sola.
 - Stile **Liquid Glass** come da `DESIGN_SYSTEM.md` (temi Mochi chiaro / Zenitsu scuro).
 
-> **Primo avvio:** come in MoneyDuo si parte dal **Gate** (accesso con Google → la casa viene trovata o creata). Chi vuole solo provare l'app può toccare **«Prova senza account»**: contiene i dati di esempio di due persone (Emilio e Sara) e funziona subito, senza login Google.
+> **Primo avvio:** come in MoneyDuo si parte dal **Gate** (accesso con Google → la famiglia viene trovata o creata). Chi vuole solo provare l'app può toccare **«Prova senza account»**: contiene i dati di esempio di due persone (Emilio e Sara) e funziona subito, senza login Google.
 >
 > **Lingue:** italiano e inglese (automatico dal dispositivo, cambiabile da Impostazioni → Aspetto).
 
@@ -130,24 +130,24 @@ L'app non ha un backend: ogni utente accede con il proprio account Google e l'ap
 
 ## 4. Accesso, condivisione e inviti
 
-**Gate.** Senza una casa collegata l'app mostra a schermo intero la schermata di accesso (come MoneyDuo): **Accedi con Google** → l'app cerca il database e lo collega, oppure propone di crearlo. «Prova senza account (dati demo)» è l'unica uscita: l'app resta in locale e la casa si può collegare in seguito da **Impostazioni → Sincronizzazione e account** (o dalla pillola «Locale»).
+**Gate.** Senza una famiglia collegata l'app mostra a schermo intero la schermata di accesso (come MoneyDuo): **Accedi con Google** → l'app cerca il database e lo collega, oppure propone di crearlo. «Prova senza account (dati demo)» è l'unica uscita: l'app resta in locale e la famiglia si può collegare in seguito da **Impostazioni → Sincronizzazione e account** (o dalla pillola «Locale»).
 
-**Sessione scaduta.** Con una casa collegata, se la sessione Google non è più valida (e sei online) il Gate di riconnessione **copre tutta l'app** e i dati restano nascosti finché non accedi; l'app resta montata sotto, inerte, così quello che stavi scrivendo non si perde. Offline si resta sui dati locali.
+**Sessione scaduta.** Con una famiglia collegata, se la sessione Google non è più valida (e sei online) il Gate di riconnessione **copre tutta l'app** e i dati restano nascosti finché non accedi; l'app resta montata sotto, inerte, così quello che stavi scrivendo non si perde. Offline si resta sui dati locali.
 
-**Cartella del database.** Alla creazione della casa e poi da *Sincronizzazione e account → Cartella del database → Sposta* (solo il proprietario) si sceglie dove sta il file: con il Picker attivo si usa il selettore di Google, altrimenti l'esplora-cartelle interno (cartelle del tuo Drive, «Nuova cartella qui»).
+**Cartella del database.** Alla creazione della famiglia e poi da *Sincronizzazione e account → Cartella del database → Sposta* (solo il proprietario) si sceglie dove sta il file: con il Picker attivo si usa il selettore di Google, altrimenti l'esplora-cartelle interno (cartelle del tuo Drive, «Nuova cartella qui»).
 
 ### Impostazioni
 
-La quarta scheda della barra si chiama **Impostazioni** e ha la stessa struttura di Clean Duo (sezioni a scomparsa, con riepilogo da chiusa): **Aspetto** (sotto i due gattini: tema Mochi/Zenitsu/automatico con descrizione, e lingua), **Casa** (nome), **Membri della casa** (inviti), **Sincronizzazione e account**, **Notifiche**, **Catalogo alimenti** (con unione dei duplicati), **Piano alimentare (JSON)** e **Dati** (backup, ripristino, ricomincia da zero).
+La quarta scheda della barra si chiama **Impostazioni** e ha la stessa struttura di Clean Duo (sezioni a scomparsa, con riepilogo da chiusa): **Aspetto** (sotto i due gattini: tema Mochi/Zenitsu/automatico con descrizione, e lingua), **Famiglia** (nome), **Membri della famiglia** (inviti), **Sincronizzazione e account**, **Notifiche**, **Catalogo alimenti** (con unione dei duplicati), **Piano alimentare (JSON)** e **Dati** (backup, ripristino, ricomincia da zero).
 
-### Chi crea la casa (proprietario)
+### Chi crea la famiglia (proprietario)
 1. **Accedi con Google** → l'app cerca un database `meal-duo-db.json` che l'account può vedere.
-2. Se non c'è: **Crea casa** (nome della casa, il tuo nome, cartella di Drive se il Picker è attivo). Il file ha il marcatore pubblico `properties.mealduo=db` e `writersCanShare=false`: **solo il proprietario può invitare o rimuovere persone**.
-3. **Impostazioni → Membri della casa → Invita con Google Drive**: inserisci l'email del familiare (e se è una persona già presente nel piano, collegala a quel membro). L'app concede il ruolo **Editor** sul file via Drive API e Drive manda l'email di invito.
+2. Se non c'è: **Crea famiglia** (nome della famiglia, il tuo nome, cartella di Drive se il Picker è attivo). Il file ha il marcatore pubblico `properties.mealduo=db` e `writersCanShare=false`: **solo il proprietario può invitare o rimuovere persone**.
+3. **Impostazioni → Membri della famiglia → Invita con Google Drive**: inserisci l'email del familiare (e se è una persona già presente nel piano, collegala a quel membro). L'app concede il ruolo **Editor** sul file via Drive API e Drive manda l'email di invito.
 
 ### Chi si unisce
 1. Apre l'app → **Collega Google Drive** → accede con *il proprio* account Google.
-2. Se l'app trova il file lo collega da sola. Altrimenti, nella schermata «Nessuna casa trovata», **Scegli il database della casa** (Picker): il file è in «Condivisi con me». Lo si fa una volta sola.
+2. Se l'app trova il file lo collega da sola. Altrimenti, nella schermata «Nessuna famiglia trovata», **Scegli il database della famiglia** (Picker): il file è in «Condivisi con me». Lo si fa una volta sola.
 3. Se sul dispositivo ci sono dati propri l'app chiede se **unirli** al file o **usare solo il file**.
 4. **Chi sei?** — l'account viene associato al membro (l'invito ha già salvato la sua email; se il file è stato condiviso a mano si sceglie il membro o ci si aggiunge).
 
@@ -184,7 +184,7 @@ Stati della pillola: *Locale* · *Da inviare* · *Sync…* · *Sincronizzato* ·
 
 ## 5b. Worker e notifiche push (facoltativo)
 
-`worker/` contiene un piccolo **Cloudflare Worker** (piano gratuito) che fa due cose: **accesso persistente** (broker OAuth) e **notifiche push anche con l'app chiusa**. Il Worker non ha mai accesso a Drive con i dati della casa: a ogni richiesta verifica il token Google di chi scrive e che abbia accesso al file; salva solo gli iscritti push (chiave `id database + email`).
+`worker/` contiene un piccolo **Cloudflare Worker** (piano gratuito) che fa due cose: **accesso persistente** (broker OAuth) e **notifiche push anche con l'app chiusa**. Il Worker non ha mai accesso a Drive con i dati della famiglia: a ogni richiesta verifica il token Google di chi scrive e che abbia accesso al file; salva solo gli iscritti push (chiave `id database + email`).
 
 Installazione passo passo: **`worker/README.md`**. In breve: `node worker/scripts/generate-vapid.mjs` → `wrangler.toml` → `wrangler kv namespace create SUBS` → `wrangler secret put …` → `wrangler deploy` → variabili GitHub `VITE_PUSH_URL` e `VITE_VAPID_PUBLIC_KEY` → rilancia il deploy.
 
@@ -279,7 +279,7 @@ L'icona definitiva (i due gattini con le borse della spesa) è in `assets/icon-s
 - **Fuzzy matching** (`pollo` → `Petto di pollo`, plurali, typo, alias, ambiguità) e unione dei duplicati con ridirezione delle voci dei piani.
 - **Merge** (commutatività, idempotenza, modifiche concorrenti su record diversi, tombstone).
 - **Import/export** (validazione con percorsi, round-trip export → import identico sulla spesa).
-- **Motore di sync** con Drive simulato: nessuna operazione se invariato, push, merge bidirezionale, **race condition** (scrittura altrui tra lettura e scrittura), sola lettura, offline, **copia locale persa/datata che non sovrascrive Drive**, creazione/collegamento della casa.
+- **Motore di sync** con Drive simulato: nessuna operazione se invariato, push, merge bidirezionale, **race condition** (scrittura altrui tra lettura e scrittura), sola lettura, offline, **copia locale persa/datata che non sovrascrive Drive**, creazione/collegamento della famiglia.
 - **Notifiche** (chi avvisare e cosa, raggruppamenti, mai per le proprie modifiche) e **coda push** (ordine, scarti, retry).
 - **i18n**: ogni testo usato nel codice ha la traduzione inglese, segnaposto e tag coerenti, nessun testo JSX lasciato fuori da `t()`; **Drive** (cartelle, spostamento, inviti, revoche, ricerca per marcatore); **membri duplicati** per email.
 - **Worker**: cifratura RFC 8291, VAPID, endpoint subscribe/notify/auth (sessioni cifrate, rinnovo, revoca), service worker push.
@@ -293,7 +293,7 @@ L'icona definitiva (i due gattini con le borse della spesa) è in `assets/icon-s
 I testi sono in italiano nel codice: `t('Testo italiano {nome}', { nome })` restituisce il testo nella lingua in uso; in inglese lo cerca in `src/i18n/en.ts` (la chiave è il testo italiano) e, se manca, ripiega sull'italiano. `tb()` accetta `<b>` e `<code>`, `tp(n, singolare, plurale)` gestisce i plurali, `dayShort/dayLong` i giorni, `locale()` date e numeri. Lingua: *Automatico* (segue il browser: italiano se `it`, altrimenti inglese), *Italiano*, *English* — da **Impostazioni → Aspetto**; si applica subito, senza ricaricare.
 
 **Aggiungere un testo:** scrivilo con `t('…')` e aggiungi la voce in `en.ts`; `npm test` fallisce se manca la traduzione, se i segnaposto non coincidono o se resta testo JSX fuori da `t()`.
-**Non si traducono i dati dell'utente:** nomi di alimenti e pasti, nomi dei membri e della casa, e il formato JSON del piano (giorni in italiano; l'import accetta anche i nomi inglesi). Le notifiche push sono scritte nella lingua di chi fa la modifica.
+**Non si traducono i dati dell'utente:** nomi di alimenti e pasti, nomi dei membri e della famiglia, e il formato JSON del piano (giorni in italiano; l'import accetta anche i nomi inglesi). Le notifiche push sono scritte nella lingua di chi fa la modifica.
 
 ---
 

@@ -29,7 +29,7 @@ export function NotificationsCard() {
   const startPush = async (): Promise<string | null> => {
     if (!server) return null
     try {
-      if (!sync.fileId) throw new Error(t('Nessuna casa collegata.'))
+      if (!sync.fileId) throw new Error(t('Nessuna famiglia collegata.'))
       await enablePush(sync.fileId, needToken())
       setPrefs({ pushEnabled: true })
       return null

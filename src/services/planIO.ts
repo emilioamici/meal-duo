@@ -152,7 +152,7 @@ export function applyImport(db: AppDatabase, memberId: string, parsed: ParsedPla
 const instructions = () => [
   t('Piano settimanale Meal Duo. Compila "days" da Lunedì a Domenica; ogni giorno ha dei pasti e ogni pasto una lista di alimenti.'),
   t('Ogni alimento: "name" (testo), "quantity" (numero > 0) e "unit" (g, kg, ml, l, pz, cucchiaio, …).'),
-  t('I nomi vengono associati al catalogo alimenti della casa (es. "pollo" → "Petto di pollo"), così la spesa somma le quantità correttamente.'),
+  t('I nomi vengono associati al catalogo alimenti della famiglia (es. "pollo" → "Petto di pollo"), così la spesa somma le quantità correttamente.'),
   t('Puoi aggiungere pasti extra: basta un nuovo elemento in "meals". I campi che iniziano con "_" sono ignorati.'),
 ]
 

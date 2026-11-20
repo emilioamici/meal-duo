@@ -18,7 +18,7 @@ export function PlanJsonCard({ bare = false }: { bare?: boolean }) {
   const fileName = `meal-duo-${member.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}.json`
   const body = (
     <>
-      <p className="text-sm text-muted">{t('Esporta il piano di {name} o un tracciato da compilare altrove (anche con un assistente AI), poi reimportalo: i nomi vengono associati al catalogo della casa.', { name: member.name })}</p>
+      <p className="text-sm text-muted">{t('Esporta il piano di {name} o un tracciato da compilare altrove (anche con un assistente AI), poi reimportalo: i nomi vengono associati al catalogo della famiglia.', { name: member.name })}</p>
       <div className="mt-3 grid grid-cols-2 gap-2">
         <button className="glass-btn btn-primary" onClick={() => setImportOpen(true)}><Upload size={16} />{t('Importa piano')}</button>
         <button className="glass-btn" onClick={() => { downloadJson(fileName, exportPlan(db, member.id)); showToast(t('Piano esportato')) }}><Download size={16} />{t('Esporta piano')}</button>

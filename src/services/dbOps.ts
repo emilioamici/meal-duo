@@ -21,8 +21,8 @@ export function emptyPlan(memberId: string, at: string = nowIso()): WeeklyPlan {
   return { memberId, updatedAt: at, days: DAY_INDEXES.map(() => emptyDay(at)) }
 }
 
-/** Casa vuota con un solo membro (chi la crea). */
-export function emptyDb(houseName = 'La nostra casa', memberName = 'Io', email?: string): AppDatabase {
+/** Famiglia vuota con un solo membro (chi la crea). */
+export function emptyDb(houseName = 'La nostra famiglia', memberName = 'Io', email?: string): AppDatabase {
   const at = nowIso()
   const member: Member = { id: uid('mem'), name: memberName, color: MEMBER_COLORS[0], email: email || undefined, updatedAt: at }
   return {

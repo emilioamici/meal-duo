@@ -19,7 +19,7 @@ const when = (iso: string) => new Date(iso).toLocaleString(locale(), { day: 'num
 
 /**
  * Flusso di collegamento (la "schermata di accesso" di MoneyDuo, qui in un foglio perché Meal Duo funziona anche in locale):
- * accesso con Google → ricerca del database → collegamento automatico / scelta / creazione della casa / invito (Picker).
+ * accesso con Google → ricerca del database → collegamento automatico / scelta / creazione della famiglia / invito (Picker).
  */
 export function ConnectFlow({ active, reconnect = false, onClose, allowLocal = false }: { active: boolean; reconnect?: boolean; onClose: () => void; allowLocal?: boolean }) {
   const { sync, db } = useStore()
@@ -31,7 +31,7 @@ export function ConnectFlow({ active, reconnect = false, onClose, allowLocal = f
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
   const [link, setLink] = useState('')
-  const [houseName, setHouseName] = useState(() => t('La nostra casa'))
+  const [houseName, setHouseName] = useState(() => t('La nostra famiglia'))
   const [myName, setMyName] = useState('')
   const [keepLocal, setKeepLocal] = useState(true)
   const [folder, setFolder] = useState<PickedFolder>({ id: 'root', name: t('Il mio Drive') })
@@ -51,7 +51,7 @@ export function ConnectFlow({ active, reconnect = false, onClose, allowLocal = f
     const { file, remote } = await engine.inspect(id)
     if (hasLocalData) { setPending({ file, remote }); return setPhase('confirm') }
     await engine.link(file, remote, 'replace')
-    done(t('Casa collegata'))
+    done(t('Famiglia collegata'))
   }
 
   const search = async () => {
@@ -61,7 +61,7 @@ export function ConnectFlow({ active, reconnect = false, onClose, allowLocal = f
       const all = await engine.listCandidates()
       const found = all.filter(isDatabaseFile)
       setDbs(found); setOthers(all.filter((f) => !isDatabaseFile(f)))
-      if (found.length === 1) return await connect(found[0].id) // una sola casa: collegamento automatico
+      if (found.length === 1) return await connect(found[0].id) // una sola famiglia: collegamento automatico
       setPhase(found.length > 1 ? 'choose' : 'none')
     } catch (e) { setErr(msg(e)); setPhase('none') }
   }
@@ -69,7 +69,7 @@ export function ConnectFlow({ active, reconnect = false, onClose, allowLocal = f
   useEffect(() => {
     if (!active) return
     if (sync.fileId && !reconnect) return close() // già collegato
-    // in riconnessione la casa è già collegata: basta rifare l'accesso, non si cerca nulla
+    // in riconnessione la famiglia è già collegata: basta rifare l'accesso, non si cerca nulla
     if (!reconnect && sync.signedIn && !started.current) { started.current = true; void search() }
     if (!sync.signedIn) setPhase('login')
   }, [active, sync.signedIn]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -92,13 +92,13 @@ export function ConnectFlow({ active, reconnect = false, onClose, allowLocal = f
           <button className="glass-btn btn-primary mt-4 w-full !py-3" disabled={busy} onClick={() => void login()}>
             {busy ? <Loader2 size={18} className="animate-spin" /> : <UserRound size={18} />}{t('Accedi con Google')}</button>
           <button className="mt-3 w-full text-xs font-semibold text-muted" disabled={busy} onClick={() => void login(true)}>{t('Usa un altro account Google')}</button>
-          <button className="mt-2 w-full text-xs font-semibold text-muted" disabled={busy} onClick={() => engine.unlink()}>{t('Scollega questa casa')}</button>
+          <button className="mt-2 w-full text-xs font-semibold text-muted" disabled={busy} onClick={() => engine.unlink()}>{t('Scollega questa famiglia')}</button>
         </>
       )}
 
       {phase === 'login' && !reconnect && (
         <>
-          <p className="text-sm text-muted">{tb('Accedi con il <b>tuo account Google</b>. Se qualcuno ti ha invitato in una casa la ritrovo io; altrimenti puoi crearne una nuova. I dati restano nel tuo Drive.')}</p>
+          <p className="text-sm text-muted">{tb('Accedi con il <b>tuo account Google</b>. Se qualcuno ti ha invitato in una famiglia la ritrovo io; altrimenti puoi crearne una nuova. I dati restano nel tuo Drive.')}</p>
           {!sync.clientId && (
             <div className="mt-3 rounded-xl border border-brand/40 bg-brand/10 p-3 text-sm">
               <p className="mb-2">{t('Manca il Client ID OAuth di Google Cloud (vedi README).')}</p>
@@ -111,11 +111,11 @@ export function ConnectFlow({ active, reconnect = false, onClose, allowLocal = f
         </>
       )}
 
-      {phase === 'searching' && <div className="flex flex-col items-center gap-3 py-8 text-sm text-muted"><Loader2 className="animate-spin text-brand" />{t('Cerco la tua casa su Drive…')}</div>}
+      {phase === 'searching' && <div className="flex flex-col items-center gap-3 py-8 text-sm text-muted"><Loader2 className="animate-spin text-brand" />{t('Cerco la tua famiglia su Drive…')}</div>}
 
       {phase === 'choose' && (
         <>
-          <p className="text-sm text-muted">{t('Hai accesso a più case. Quale vuoi aprire?')}</p>
+          <p className="text-sm text-muted">{t('Hai accesso a più famiglie. Quale vuoi aprire?')}</p>
           <FileList files={dbs} busy={busy} onPick={(id) => void guard(() => connect(id))} />
         </>
       )}
@@ -123,21 +123,21 @@ export function ConnectFlow({ active, reconnect = false, onClose, allowLocal = f
       {phase === 'confirm' && pending && (
         <>
           <p className="text-sm text-muted">{t('Su questo dispositivo ci sono dati non ancora presenti in «{name}» (modificato {when}). Vuoi unirli ai dati del file o usare solo il file? In quel caso i dati locali verranno scartati.', { name: pending.file.name, when: when(pending.file.modifiedTime) })}</p>
-          <button className="glass-btn btn-primary mt-4 w-full" disabled={busy} onClick={() => void guard(async () => { await engine.link(pending.file, pending.remote, 'merge'); done(t('Casa collegata')) })}>{t('Unisci ai dati del file')}</button>
-          <button className="glass-btn mt-2 w-full" disabled={busy} onClick={() => void guard(async () => { await engine.link(pending.file, pending.remote, 'replace'); done(t('Casa collegata')) })}>{t('Usa solo il file Drive')}</button>
+          <button className="glass-btn btn-primary mt-4 w-full" disabled={busy} onClick={() => void guard(async () => { await engine.link(pending.file, pending.remote, 'merge'); done(t('Famiglia collegata')) })}>{t('Unisci ai dati del file')}</button>
+          <button className="glass-btn mt-2 w-full" disabled={busy} onClick={() => void guard(async () => { await engine.link(pending.file, pending.remote, 'replace'); done(t('Famiglia collegata')) })}>{t('Usa solo il file Drive')}</button>
           <button className="mt-3 w-full text-sm font-semibold text-muted" onClick={() => setPhase('none')}>{t('Annulla')}</button>
         </>
       )}
 
       {phase === 'none' && (
         <>
-          <p className="text-sm">{tb('Nessuna casa trovata per <b>{email}</b>.', { email: sync.email ?? t('questo account') })}</p>
+          <p className="text-sm">{tb('Nessuna famiglia trovata per <b>{email}</b>.', { email: sync.email ?? t('questo account') })}</p>
 
           {pickerConfigured() ? (
             <div className="mt-3 space-y-2 rounded-2xl border border-line bg-bg/60 p-3">
               <p className="flex items-center gap-2 text-sm font-semibold"><Folder size={16} className="text-brand" />{t('Hai ricevuto un invito?')}</p>
               <p className="text-xs text-muted">{t('Il proprietario ha condiviso il database con te: scegli quel file su Drive (lo trovi in «Condivisi con me»). Lo si fa una volta sola.')}</p>
-              <button className="glass-btn btn-primary w-full" disabled={busy} onClick={() => void guard(async () => { const f = await engine.pickDatabase(); if (f) await connect(f.id) })}><Folder size={18} />{t('Scegli il database della casa')}</button>
+              <button className="glass-btn btn-primary w-full" disabled={busy} onClick={() => void guard(async () => { const f = await engine.pickDatabase(); if (f) await connect(f.id) })}><Folder size={18} />{t('Scegli il database della famiglia')}</button>
             </div>
           ) : (
             <details className="mt-3 text-sm">
@@ -151,9 +151,9 @@ export function ConnectFlow({ active, reconnect = false, onClose, allowLocal = f
           )}
 
           <div className="mt-3 space-y-1 rounded-2xl border border-line bg-bg/60 p-3">
-            <p className="flex items-center gap-2 text-sm font-semibold"><Users size={16} className="text-brand" />{t('Crea la tua casa')}</p>
+            <p className="flex items-center gap-2 text-sm font-semibold"><Users size={16} className="text-brand" />{t('Crea la tua famiglia')}</p>
             <p className="text-xs text-muted">{t('Il database sarà un file nel tuo Drive: tu sei il proprietario e inviti gli altri dalle Impostazioni.')}</p>
-            <label className="label">{t('Nome della casa')}</label>
+            <label className="label">{t('Nome della famiglia')}</label>
             <input className="field" value={houseName} onChange={(e) => setHouseName(e.target.value)} />
             <label className="label">{t('Il tuo nome')}</label>
             <input className="field" value={myName} onChange={(e) => setMyName(e.target.value)} />
@@ -170,8 +170,8 @@ export function ConnectFlow({ active, reconnect = false, onClose, allowLocal = f
               <label className="mt-3 flex items-center gap-2 text-sm"><input type="checkbox" checked={keepLocal} onChange={(e) => setKeepLocal(e.target.checked)} />{t('Porta con me i dati già presenti su questo dispositivo')}</label>
             )}
             <button className="glass-btn btn-primary mt-3 w-full !py-3" disabled={busy || !houseName.trim()}
-              onClick={() => void guard(async () => { await engine.createHouse({ houseName, memberName: myName, folderId: folder.id === 'root' ? null : folder.id, keepLocal }); done(t('Casa creata su Drive')) })}>
-              {busy ? <Loader2 size={18} className="animate-spin" /> : <Users size={18} />}{t('Crea casa')}</button>
+              onClick={() => void guard(async () => { await engine.createHouse({ houseName, memberName: myName, folderId: folder.id === 'root' ? null : folder.id, keepLocal }); done(t('Famiglia creata su Drive')) })}>
+              {busy ? <Loader2 size={18} className="animate-spin" /> : <Users size={18} />}{t('Crea famiglia')}</button>
           </div>
 
           <p className="mt-3 text-sm text-muted">{tb('Aspetti un invito? Chiedi al proprietario di aggiungere <b>{email}</b>, poi', { email: sync.email ?? t('la tua email') })}<button className="ml-1 inline-flex items-center gap-1 font-semibold text-brand" disabled={busy} onClick={() => void search()}><RefreshCw size={14} />{t('cerca di nuovo')}</button>.</p>

@@ -7,7 +7,7 @@ import { tb } from '../i18n/rich'
 import { t } from '../i18n'
 
 /**
- * Collega l'account Google al membro della casa:
+ * Collega l'account Google al membro della famiglia:
  *  - invitato per email: il membro esiste già (la sua email è nel database)
  *  - altrimenti, se ci sono membri senza account chiede «chi sei?»; se non ce ne sono aggiunge chi accede.
  */
@@ -41,7 +41,7 @@ export function IdentityGuard() {
 
   return (
     <Sheet open onClose={() => undefined} title={t('Chi sei?')}>
-      <p className="mb-4 flex items-start gap-2 text-sm text-muted"><UserCheck size={18} className="mt-0.5 shrink-0 text-brand" />{tb('Hai effettuato l\'accesso come <b>{email}</b>. Scegli quale membro della casa sei: l\'account verrà associato al tuo piano.', { email: sync.email ?? '' })}</p>
+      <p className="mb-4 flex items-start gap-2 text-sm text-muted"><UserCheck size={18} className="mt-0.5 shrink-0 text-brand" />{tb('Hai effettuato l\'accesso come <b>{email}</b>. Scegli quale membro della famiglia sei: l\'account verrà associato al tuo piano.', { email: sync.email ?? '' })}</p>
       <div className="space-y-2">
         {unclaimed.map((m) => (
           <button key={m.id} className="flex w-full items-center gap-3 rounded-2xl border border-line bg-surface p-3 text-left active:bg-line/30" onClick={() => claim(m.id)}>

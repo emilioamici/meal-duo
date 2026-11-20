@@ -3,8 +3,8 @@ import { ConnectFlow } from './ConnectSheet'
 import { t } from '../i18n'
 
 /**
- * Schermata iniziale (come in MoneyDuo): accesso con Google, poi la casa viene trovata e collegata in automatico (o se ne crea una).
- * `reconnect`: sessione scaduta con una casa già collegata, la schermata copre l'app finché non si rientra.
+ * Schermata iniziale (come in MoneyDuo): accesso con Google, poi la famiglia viene trovata e collegata in automatico (o se ne crea una).
+ * `reconnect`: sessione scaduta con una famiglia già collegata, la schermata copre l'app finché non si rientra.
  */
 export function Gate({ reconnect = false, onLocal }: { reconnect?: boolean; onLocal?: () => void }) {
   return (

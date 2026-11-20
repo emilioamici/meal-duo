@@ -1,6 +1,6 @@
 # Meal Duo — Autenticazione, sincronizzazione Drive, Worker e notifiche
 
-Documento tecnico e operativo. Spiega come Meal Duo gestisce l'accesso con Google, la sincronizzazione del database condiviso su Google Drive, il Worker Cloudflare (accesso persistente + notifiche push) e la condivisione tra i membri della casa. L'architettura è la stessa di **MoneyDuo** (repo `money-duo`); dove Meal Duo si discosta è indicato nel §10.
+Documento tecnico e operativo. Spiega come Meal Duo gestisce l'accesso con Google, la sincronizzazione del database condiviso su Google Drive, il Worker Cloudflare (accesso persistente + notifiche push) e la condivisione tra i membri della famiglia. L'architettura è la stessa di **MoneyDuo** (repo `money-duo`); dove Meal Duo si discosta è indicato nel §10.
 
 ---
 
@@ -24,9 +24,9 @@ Documento tecnico e operativo. Spiega come Meal Duo gestisce l'accesso con Googl
 ```
 
 Principi:
-- **Nessun backend proprietario per i dati.** Il database è **un file JSON su Drive** del proprietario della casa; tutti i membri lo leggono e scrivono con il proprio account Google.
+- **Nessun backend proprietario per i dati.** Il database è **un file JSON su Drive** del proprietario della famiglia; tutti i membri lo leggono e scrivono con il proprio account Google.
 - **Il Worker è facoltativo.** Senza, l'app funziona (sessione a popup da 1 h, notifiche solo ad app aperta/in background). Con il Worker: accesso persistente senza popup e push ad app chiusa.
-- **Il Worker non vede mai i dati della casa.** Verifica il token Google di chi scrive e che abbia accesso al file; conserva solo token di rinnovo (cifrati) e iscrizioni push.
+- **Il Worker non vede mai i dati della famiglia.** Verifica il token Google di chi scrive e che abbia accesso al file; conserva solo token di rinnovo (cifrati) e iscrizioni push.
 - **Offline-first.** Il DB vive in memoria con copia in IndexedDB; Drive è la fonte di verità condivisa.
 
 ---
@@ -131,13 +131,13 @@ La cache scrive in IndexedDB (con ripiego su `localStorage`), con debounce 300 m
 Al primo avvio il **Gate** (oppure, in modalità demo, `Impostazioni → Sincronizzazione e account → Collega Google Drive`) esegue il flusso `ConnectFlow`:
 1. **Accedi con Google** (popup o broker).
 2. `listCandidates()` cerca file con `properties mealduo=db` o nome `meal-duo…` accessibili all'app.
-3. Nessuno trovato → **Crea casa**: `engine.createHouse()` crea il file (`createFile`, multipart, `writersCanShare:false`) con un DB nuovo che contiene il proprietario (con la sua email) — oppure con i dati già presenti se si sceglie «Porta con me i dati».
+3. Nessuno trovato → **Crea famiglia**: `engine.createHouse()` crea il file (`createFile`, multipart, `writersCanShare:false`) con un DB nuovo che contiene il proprietario (con la sua email) — oppure con i dati già presenti se si sceglie «Porta con me i dati».
 4. **Invita**: `Membri → Invita con Google Drive` → `drive.shareFile()` (`POST /files/{id}/permissions`, `role: writer`, `sendNotificationEmail=true`) e crea (o collega a un membro esistente) il membro con quell'email.
 
 ### 5.2 Chi si unisce
 Accede con il proprio account → `ConnectSheet`:
-- 1 casa trovata → collegata automaticamente (se ci sono dati locali non demo: scelta **unisci** / **usa solo il file**);
-- più case → elenco;
+- 1 famiglia trovata → collegata automaticamente (se ci sono dati locali non demo: scelta **unisci** / **usa solo il file**);
+- più famiglie → elenco;
 - nessuna → «Hai ricevuto un invito?» → **Picker** (`pickDatabase`, vista «condivisi con me») → collegamento. Con `drive.file` questo gesto è ciò che concede all'app l'accesso a quel file.
 - (senza Picker) campo «Ho il link o l'ID»: funziona solo con scope completo o file già aperto con quell'account.
 
@@ -162,7 +162,7 @@ Il proprietario: `Membri → Modifica → Rimuovi membro` → `drive.removeShare
 Mai notificato per le proprie modifiche; le modifiche senza autore non generano nulla.
 
 ### 6.2 Ricezione (campanella + avvisi)
-Quando arrivano dati **remoti** (`source:'remote'`) lo store calcola `diffNotifications(prev,next,me)`: le notifiche vanno nella campanella (persistite per casa+membro in `localStorage`), se l'app è in primo piano compare un avviso, se è in background e le notifiche di sistema sono attive → `registration.showNotification` (tag = `n.tag`, per sostituire invece di accumulare).
+Quando arrivano dati **remoti** (`source:'remote'`) lo store calcola `diffNotifications(prev,next,me)`: le notifiche vanno nella campanella (persistite per famiglia+membro in `localStorage`), se l'app è in primo piano compare un avviso, se è in background e le notifiche di sistema sono attive → `registration.showNotification` (tag = `n.tag`, per sostituire invece di accumulare).
 
 ### 6.3 Invio ai familiari (push)
 Dopo una modifica **locale** (`commit`) `queuePeers(prev,next,me)`: per ogni altro membro con email calcola `diffNotifications(prev,next,m.id)` e mette le voci nella **coda persistente** (`pushQueue`, `localStorage: mealduo:pushQueue`, max 100, scarto dopo 24 h, deduplicazione per `key`).
@@ -249,7 +249,7 @@ Poi **Settings → Pages → Source: GitHub Actions** e rilancia il deploy.
 
 ### 8.4 Sui dispositivi
 1. Apri l'app → *Impostazioni → Sincronizzazione e account → Collega Google Drive* → accedi. (Con il Worker: «Attiva l'accesso persistente» se già dentro.)
-2. Proprietario: *Crea casa* → *Invita con Google Drive*. Gli altri: accedono e scelgono il database (Picker).
+2. Proprietario: *Crea famiglia* → *Invita con Google Drive*. Gli altri: accedono e scelgono il database (Picker).
 3. *Impostazioni → Notifiche → Attiva notifiche* su ogni telefono; «Invia una notifica di prova».
 
 ---
@@ -279,7 +279,7 @@ Poi **Settings → Pages → Source: GitHub Actions** e rilancia il deploy.
 | Aspetto | MoneyDuo | Meal Duo |
 |---|---|---|
 | Avvio | **Gate** a schermo intero: senza `fileId` non si entra | **Uguale**: `Gate` (`components/Gate.tsx`). Unica aggiunta: «Prova senza account (dati demo)», perché la demo era un requisito di Meal Duo (`lib/localMode.ts`). Chi ha già dati locali non vede il Gate |
-| Sessione scaduta con casa collegata | Overlay che blocca l'app finché non si rientra | **Uguale**: overlay `login-overlay` (z-100) con `Gate reconnect`; l'app resta montata sotto con `inert` |
+| Sessione scaduta con famiglia collegata | Overlay che blocca l'app finché non si rientra | **Uguale**: overlay `login-overlay` (z-100) con `Gate reconnect`; l'app resta montata sotto con `inert` |
 | Selettore cartella | `FolderPicker` interno + Picker | **Uguale**: `FolderPicker` (esplora/crea cartelle) quando il Picker non è configurato, altrimenti Picker; in più «Sposta il database» (`engine.moveTo`) nella scheda Sincronizzazione |
 | Lingue | catalogo it/en | **Uguale**: `src/i18n` (`t`, `tb`, `tp`, `dayShort/dayLong`, `locale`), `en.ts`, selettore Automatico/Italiano/English, test di copertura |
 | Service worker | `public/sw.js` scritto a mano | Workbox (`vite-plugin-pwa`) + `public/push-sw.js` con gli stessi gestori `push`/`notificationclick` (stesso comportamento: niente notifica con l'app in primo piano, `postMessage` per sincronizzare subito). La differenza è solo nel *come* si fa il caching |
@@ -313,8 +313,8 @@ Poi **Settings → Pages → Source: GitHub Actions** e rilancia il deploy.
 
 ## 12. Cosa è stato verificato (e cosa no)
 
-**Verificato automaticamente (151 test):** merge (commutatività, idempotenza, tombstone), motore di sync con Drive simulato (push, merge bidirezionale, race GET→PATCH, sola lettura, offline, copia persa/datata, creazione/collegamento casa), notifiche, coda push, cifratura RFC 8291, VAPID, endpoint del Worker (subscribe/notify/auth), service worker push.
+**Verificato automaticamente (151 test):** merge (commutatività, idempotenza, tombstone), motore di sync con Drive simulato (push, merge bidirezionale, race GET→PATCH, sola lettura, offline, copia persa/datata, creazione/collegamento famiglia), notifiche, coda push, cifratura RFC 8291, VAPID, endpoint del Worker (subscribe/notify/auth), service worker push.
 
-**Verificato in browser (Playwright, due dispositivi, Drive e Worker simulati):** Anna parte dal **Gate** e accede con sessione persistente → crea la casa → invita Bruno (permesso `writer` su Drive) → Bruno accede, la casa viene trovata e collegata da sola, nessun membro duplicato → Bruno aggiunge una voce extra → viene scritta su Drive con l'autore, il Worker riceve la richiesta di push per Anna → Anna sincronizza e vede la notifica nella campanella → la sua sessione viene revocata: compare l'**overlay di riconnessione** → ritorno dal login col Worker (sessione nel frammento dell'URL) e l'app riprende. In un altro test: primo avvio in inglese → «Prova senza account» → nessuna parola italiana nell'interfaccia → cambio lingua immediato.
+**Verificato in browser (Playwright, due dispositivi, Drive e Worker simulati):** Anna parte dal **Gate** e accede con sessione persistente → crea la famiglia → invita Bruno (permesso `writer` su Drive) → Bruno accede, la famiglia viene trovata e collegata da sola, nessun membro duplicato → Bruno aggiunge una voce extra → viene scritta su Drive con l'autore, il Worker riceve la richiesta di push per Anna → Anna sincronizza e vede la notifica nella campanella → la sua sessione viene revocata: compare l'**overlay di riconnessione** → ritorno dal login col Worker (sessione nel frammento dell'URL) e l'app riprende. In un altro test: primo avvio in inglese → «Prova senza account» → nessuna parola italiana nell'interfaccia → cambio lingua immediato.
 
 **Non verificato:** OAuth e Drive reali con un Client ID (serve il tuo progetto Cloud), Picker reale, deploy reale del Worker su Cloudflare, push ricevuto su iOS/Android reali. Sono i primi passi da fare dopo il setup di §8.
