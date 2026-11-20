@@ -249,3 +249,27 @@ export function renameHouse(db: AppDatabase, name: string): AppDatabase {
   const at = nowIso()
   return touch({ ...db, houseName: name.trim() || db.houseName }, at)
 }
+
+/**
+ * Più membri attivi con la stessa email (es. l'invitato è entrato prima che l'invito arrivasse su Drive e si è aggiunto da solo):
+ * si tiene quello con più alimenti nel piano (a parità, il più vecchio) e gli altri diventano tombstone insieme al loro piano.
+ */
+export function dedupeMembersByEmail(db: AppDatabase): AppDatabase {
+  const byMail = new Map<string, Member[]>()
+  for (const m of liveMembers(db)) {
+    const k = m.email?.trim().toLowerCase()
+    if (k) byMail.set(k, [...(byMail.get(k) ?? []), m])
+  }
+  const items = (id: string) => (db.plans[id]?.days ?? []).reduce((n, d) => n + d.meals.reduce((k, m) => k + m.items.length, 0), 0)
+  const drop = new Set<string>()
+  for (const list of byMail.values()) {
+    if (list.length < 2) continue
+    const [, ...rest] = [...list].sort((a, b) => items(b.id) - items(a.id) || a.updatedAt.localeCompare(b.updatedAt) || a.id.localeCompare(b.id))
+    rest.forEach((m) => drop.add(m.id))
+  }
+  if (!drop.size) return db
+  const at = nowIso()
+  const plans = { ...db.plans }
+  for (const id of drop) if (plans[id]) plans[id] = { ...plans[id], deleted: true, updatedAt: at }
+  return touch({ ...db, members: db.members.map((m) => (drop.has(m.id) ? { ...m, deleted: true, updatedAt: at } : m)), plans }, at)
+}

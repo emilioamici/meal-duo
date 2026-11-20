@@ -6,10 +6,11 @@ import { Fab, HeaderActions } from '../components/Chrome'
 import { MascotImg, MascotPeek } from '../components/Mascots'
 import { useStore } from '../state/store'
 import { useUi } from '../state/ui'
-import { DAY_INDEXES, DAY_SHORT, type DayIndex, type ExtraItem, type Member, type ShoppingLine } from '../types'
+import { DAY_INDEXES, type DayIndex, type ExtraItem, type Member, type ShoppingLine } from '../types'
 import { buildShoppingList, extraChecked, groupByCategory, liveExtras, shoppingProgress } from '../services/shoppingListEngine'
 import { addExtra, removeExtra, resetShopping, toggleCheck, toggleExtra } from '../services/dbOps'
 import { formatCompact, formatQuantity } from '../lib/units'
+import { t, dayShort } from '../i18n'
 
 export function ShoppingView() {
   const { db, members, commit } = useStore()
@@ -29,7 +30,7 @@ export function ShoppingView() {
   const sameDays = (a: DayIndex[]) => a.length === includedDays.length && a.every((d) => includedDays.includes(d))
 
   const celebrateIfDone = (e: React.MouseEvent, willBeDone: number) => {
-    if (progress.total > 0 && willBeDone === progress.total) celebrate(e.clientX, e.clientY, 'Spesa completata!')
+    if (progress.total > 0 && willBeDone === progress.total) celebrate(e.clientX, e.clientY, t('Spesa completata!'))
   }
   const onToggleLine = (e: React.MouseEvent, l: ShoppingLine) => {
     commit((d) => toggleCheck(d, l.key, !l.checked))
@@ -46,14 +47,14 @@ export function ShoppingView() {
 
   return (
     <>
-      <PageHeader title="Spesa" subtitle={progress.total === 0 ? 'Nessun articolo' : remaining === 0 ? 'Tutto nel carrello!' : `${remaining} da comprare`} right={<HeaderActions />} />
+      <PageHeader title={t('Spesa')} subtitle={progress.total === 0 ? t('Nessun articolo') : remaining === 0 ? t('Tutto nel carrello!') : t('{n} da comprare', { n: remaining })} right={<HeaderActions />} />
 
       <MascotPeek kind="zenitsu" side="left">
         <div className="card p-4">
           <div className="flex items-end justify-between">
             <div>
               <p className="text-4xl font-extrabold leading-none">{remaining}</p>
-              <p className="mt-1 text-sm text-muted">articoli da comprare{excludedCount > 0 && <span className="font-semibold text-brand"> · filtri attivi</span>}</p>
+              <p className="mt-1 text-sm text-muted">{t('articoli da comprare')}{excludedCount > 0 && <span className="font-semibold text-brand"> {t('· filtri attivi')}</span>}</p>
             </div>
             <p className="text-sm font-semibold text-muted">{progress.done}/{progress.total}</p>
           </div>
@@ -62,8 +63,8 @@ export function ShoppingView() {
       </MascotPeek>
 
       {/* ---- Barra filtri: escludi membri / giorni ---- */}
-      <section className="card mt-3 p-4" aria-label="Filtri di calcolo">
-        <p className="label !mt-0">Per chi</p>
+      <section className="card mt-3 p-4" aria-label={t('Filtri di calcolo')}>
+        <p className="label !mt-0">{t('Per chi')}</p>
         <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
           {members.map((m) => {
             const on = !filters.excludedMemberIds.includes(m.id)
@@ -74,39 +75,39 @@ export function ShoppingView() {
             )
           })}
         </div>
-        <p className="label">Giorni</p>
+        <p className="label">{t('Giorni')}</p>
         <div className="grid grid-cols-7 gap-1.5">
           {DAY_INDEXES.map((d) => {
             const on = !filters.excludedDays.includes(d)
-            return <button key={d} aria-pressed={on} onClick={() => toggleDay(d)} className={`chip justify-center !px-0 !text-xs ${on ? 'chip-active' : 'opacity-70'}`}>{DAY_SHORT[d]}</button>
+            return <button key={d} aria-pressed={on} onClick={() => toggleDay(d)} className={`chip justify-center !px-0 !text-xs ${on ? 'chip-active' : 'opacity-70'}`}>{dayShort(d)}</button>
           })}
         </div>
         <div className="-mx-1 mt-2 flex gap-2 overflow-x-auto px-1 pb-1">
-          <button className={`chip !text-xs ${sameDays([0, 1, 2, 3, 4, 5, 6]) ? 'border-brand' : ''}`} onClick={() => setDays([0, 1, 2, 3, 4, 5, 6])}>Tutta la settimana</button>
-          <button className={`chip !text-xs ${sameDays([0, 1, 2, 3, 4]) ? 'border-brand' : ''}`} onClick={() => setDays([0, 1, 2, 3, 4])}>Senza weekend</button>
-          <button className={`chip !text-xs ${sameDays([0, 1, 2, 3]) ? 'border-brand' : ''}`} onClick={() => setDays([0, 1, 2, 3])}>Lun–Gio</button>
-          {excludedCount > 0 && <button className="chip !text-xs text-brand" onClick={() => setFilters({ excludedMemberIds: [], excludedDays: [] })}><RotateCcw size={13} />Azzera filtri</button>}
+          <button className={`chip !text-xs ${sameDays([0, 1, 2, 3, 4, 5, 6]) ? 'border-brand' : ''}`} onClick={() => setDays([0, 1, 2, 3, 4, 5, 6])}>{t('Tutta la settimana')}</button>
+          <button className={`chip !text-xs ${sameDays([0, 1, 2, 3, 4]) ? 'border-brand' : ''}`} onClick={() => setDays([0, 1, 2, 3, 4])}>{t('Senza weekend')}</button>
+          <button className={`chip !text-xs ${sameDays([0, 1, 2, 3]) ? 'border-brand' : ''}`} onClick={() => setDays([0, 1, 2, 3])}>{t('Lun–Gio')}</button>
+          {excludedCount > 0 && <button className="chip !text-xs text-brand" onClick={() => setFilters({ excludedMemberIds: [], excludedDays: [] })}><RotateCcw size={13} />{t('Azzera filtri')}</button>}
         </div>
         <div className="mt-3">
-          <Segmented value={grouped ? 'cat' : 'az'} onChange={(v) => setGrouped(v === 'cat')} options={[{ id: 'az', label: 'A–Z' }, { id: 'cat', label: 'Per categoria' }]} />
+          <Segmented value={grouped ? 'cat' : 'az'} onChange={(v) => setGrouped(v === 'cat')} options={[{ id: 'az', label: t('A–Z') }, { id: 'cat', label: t('Per categoria') }]} />
         </div>
       </section>
 
       {/* ---- Lista aggregata ---- */}
       <div className="mt-3 space-y-3">
         {lines.length === 0 && (
-          <EmptyCard mascot={<MascotImg kind="mochi" className="mx-auto h-16 w-auto" />} title="Niente da comprare"
-            text={excludedCount > 0 ? 'I filtri attuali escludono tutti i piani: riattiva qualche membro o giorno.' : 'Aggiungi alimenti ai piani per generare la spesa.'} />
+          <EmptyCard mascot={<MascotImg kind="mochi" className="mx-auto h-16 w-auto" />} title={t('Niente da comprare')}
+            text={excludedCount > 0 ? t('I filtri attuali escludono tutti i piani: riattiva qualche membro o giorno.') : t('Aggiungi alimenti ai piani per generare la spesa.')} />
         )}
         {sections.map((s) => (
           <div key={s.category || 'all'}>
-            {s.category && <h2 className="mb-2 mt-1 px-1 text-xs font-semibold uppercase tracking-wide text-muted">{s.category}</h2>}
+            {s.category && <h2 className="mb-2 mt-1 px-1 text-xs font-semibold uppercase tracking-wide text-muted">{t(s.category)}</h2>}
             <ul className="space-y-2">
               <AnimatePresence initial={false}>
                 {s.lines.map((l) => (
                   <motion.li key={l.key} layout initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, x: 90, scale: 0.92 }} transition={{ type: 'spring', stiffness: 400, damping: 34 }}>
                     <div className={`card flex items-start gap-3 p-3 ${l.checked ? 'opacity-60' : ''}`}>
-                      <CheckButton checked={l.checked} label={`${l.name}: ${l.checked ? 'da comprare' : 'preso'}`} onClick={(e) => onToggleLine(e, l)} />
+                      <CheckButton checked={l.checked} label={t(l.checked ? '{name}: da comprare' : '{name}: preso', { name: l.name })} onClick={(e) => onToggleLine(e, l)} />
                       <div className="min-w-0 flex-1 pt-0.5">
                         <div className="flex items-baseline justify-between gap-3">
                           <span className={`min-w-0 truncate font-semibold leading-tight ${l.checked ? 'line-through' : ''}`}>{l.name}</span>
@@ -126,7 +127,7 @@ export function ShoppingView() {
 
         {extras.length > 0 && (
           <div>
-            <h2 className="mb-2 mt-1 px-1 text-xs font-semibold uppercase tracking-wide text-muted">Extra</h2>
+            <h2 className="mb-2 mt-1 px-1 text-xs font-semibold uppercase tracking-wide text-muted">{t('Extra')}</h2>
             <ul className="space-y-2">
               <AnimatePresence initial={false}>
                 {extras.map((x) => {
@@ -134,9 +135,9 @@ export function ShoppingView() {
                   return (
                     <motion.li key={x.id} layout initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, x: 90, scale: 0.92 }} transition={{ type: 'spring', stiffness: 400, damping: 34 }}>
                       <div className={`card flex items-center gap-3 p-3 ${done ? 'opacity-60' : ''}`}>
-                        <CheckButton checked={done} label={`${x.name}: ${done ? 'da comprare' : 'preso'}`} onClick={(e) => onToggleExtra(e, x)} />
+                        <CheckButton checked={done} label={t(done ? '{name}: da comprare' : '{name}: preso', { name: x.name })} onClick={(e) => onToggleExtra(e, x)} />
                         <span className={`min-w-0 flex-1 truncate font-semibold ${done ? 'line-through' : ''}`}>{x.name}{x.quantity && <span className="ml-2 text-sm font-medium text-muted">{x.quantity}</span>}</span>
-                        <button className="glass-btn !h-10 !w-10 shrink-0 !p-0" aria-label={`Rimuovi ${x.name}`} onClick={() => commit((d) => removeExtra(d, x.id))}><X size={16} /></button>
+                        <button className="glass-btn !h-10 !w-10 shrink-0 !p-0" aria-label={t('Rimuovi {name}', { name: x.name })} onClick={() => commit((d) => removeExtra(d, x.id))}><X size={16} /></button>
                       </div>
                     </motion.li>
                   )
@@ -147,12 +148,12 @@ export function ShoppingView() {
         )}
 
         {progress.total > 0 && (
-          <ConfirmButton className="w-full" label={<><RotateCcw size={16} />Nuova spesa · resetta spunte</>} confirmLabel="Tocca ancora: azzera le spunte e gli extra presi"
+          <ConfirmButton className="w-full" label={<><RotateCcw size={16} />{t('Nuova spesa · resetta spunte')}</>} confirmLabel={t('Tocca ancora: azzera le spunte e gli extra presi')}
             onConfirm={() => commit(resetShopping)} />
         )}
       </div>
 
-      <Fab label="Aggiungi voce extra" onClick={() => setExtraOpen(true)} />
+      <Fab label={t('Aggiungi voce extra')} onClick={() => setExtraOpen(true)} />
       <ExtraSheet open={extraOpen} onClose={() => setExtraOpen(false)} />
     </>
   )
@@ -186,13 +187,13 @@ function ExtraSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
     setName(''); setQty(''); onClose()
   }
   return (
-    <Sheet open={open} onClose={onClose} title="Voce extra">
-      <p className="text-sm text-muted">Articoli non legati alla dieta (es. carta forno, detersivo).</p>
-      <label className="label">Nome</label>
-      <input className="field" value={name} autoFocus placeholder="Carta forno" onChange={(e) => setName(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && save()} />
-      <label className="label">Quantità (facoltativa)</label>
-      <input className="field" value={qty} placeholder="2 rotoli" onChange={(e) => setQty(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && save()} />
-      <button className="glass-btn btn-primary mt-5 w-full !py-3.5" disabled={!name.trim()} onClick={save}><Plus size={16} />Aggiungi alla spesa</button>
+    <Sheet open={open} onClose={onClose} title={t('Voce extra')}>
+      <p className="text-sm text-muted">{t('Articoli non legati alla dieta (es. carta forno, detersivo).')}</p>
+      <label className="label">{t('Nome')}</label>
+      <input className="field" value={name} autoFocus placeholder={t('Carta forno')} onChange={(e) => setName(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && save()} />
+      <label className="label">{t('Quantità (facoltativa)')}</label>
+      <input className="field" value={qty} placeholder={t('2 rotoli')} onChange={(e) => setQty(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && save()} />
+      <button className="glass-btn btn-primary mt-5 w-full !py-3.5" disabled={!name.trim()} onClick={save}><Plus size={16} />{t('Aggiungi alla spesa')}</button>
     </Sheet>
   )
 }

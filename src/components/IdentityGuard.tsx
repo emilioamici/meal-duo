@@ -2,7 +2,9 @@ import { UserCheck } from 'lucide-react'
 import { useEffect } from 'react'
 import { Avatar, Sheet } from './ui'
 import { useStore } from '../state/store'
-import { addMember, MEMBER_COLORS, updateMember } from '../services/dbOps'
+import { addMember, dedupeMembersByEmail, MEMBER_COLORS, updateMember } from '../services/dbOps'
+import { tb } from '../i18n/rich'
+import { t } from '../i18n'
 
 /**
  * Collega l'account Google al membro della casa:
@@ -13,6 +15,12 @@ export function IdentityGuard() {
   const { db, members, commit, me, sync } = useStore()
   const ready = !!sync.fileId && sync.status === 'synced' && !!sync.email && sync.reconciled
   const unclaimed = members.filter((m) => !m.email)
+
+  // due membri con la stessa email (invito arrivato dopo il primo accesso): si unificano, tenendo quello col piano
+  useEffect(() => {
+    if (!ready || !me) return
+    commit(dedupeMembersByEmail)
+  }, [ready, me, members.length]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // nessun membro da associare: chi accede viene aggiunto. Rivalutato sul DB più recente dentro commit → idempotente.
   useEffect(() => {
@@ -27,15 +35,15 @@ export function IdentityGuard() {
   void db
 
   return (
-    <Sheet open onClose={() => undefined} title="Chi sei?">
-      <p className="mb-4 flex items-start gap-2 text-sm text-muted"><UserCheck size={18} className="mt-0.5 shrink-0 text-brand" />Hai effettuato l'accesso come <b className="text-ink">{sync.email}</b>. Scegli quale membro della casa sei: l'account verrà associato al tuo piano.</p>
+    <Sheet open onClose={() => undefined} title={t('Chi sei?')}>
+      <p className="mb-4 flex items-start gap-2 text-sm text-muted"><UserCheck size={18} className="mt-0.5 shrink-0 text-brand" />{tb('Hai effettuato l\'accesso come <b>{email}</b>. Scegli quale membro della casa sei: l\'account verrà associato al tuo piano.', { email: sync.email ?? '' })}</p>
       <div className="space-y-2">
         {unclaimed.map((m) => (
           <button key={m.id} className="flex w-full items-center gap-3 rounded-2xl border border-line bg-surface p-3 text-left active:bg-line/30" onClick={() => claim(m.id)}>
-            <Avatar member={m} size={36} /><span className="font-semibold">Sono {m.name}</span>
+            <Avatar member={m} size={36} /><span className="font-semibold">{t('Sono {name}', { name: m.name })}</span>
           </button>
         ))}
-        <button className="glass-btn w-full" onClick={addNew}>Nessuno di questi: aggiungimi come nuovo membro</button>
+        <button className="glass-btn w-full" onClick={addNew}>{t('Nessuno di questi: aggiungimi come nuovo membro')}</button>
       </div>
     </Sheet>
   )

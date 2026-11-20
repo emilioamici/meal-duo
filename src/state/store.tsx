@@ -5,6 +5,7 @@
  */
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
 import type { AppDatabase, Member } from '../types'
+import { t } from '../i18n'
 import { createDemoDb } from '../data/demo'
 import { emptyDb, liveMembers } from '../services/dbOps'
 import { mergeDatabases } from '../services/merge'
@@ -228,7 +229,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const startFresh = useCallback(() => {
     const keepEmail = meRef.current?.email ?? engine.getSnapshot().email ?? undefined
-    apply(() => emptyDb('La nostra casa', meRef.current?.name ?? 'Io', keepEmail), true)
+    apply(() => emptyDb(t('La nostra casa'), meRef.current?.name ?? 'Io', keepEmail), true)
   }, [apply])
   const importDatabase = useCallback((next: AppDatabase) => apply((prev) => mergeDatabases(prev, next), true), [apply])
 

@@ -128,7 +128,7 @@ La cache scrive in IndexedDB (con ripiego su `localStorage`), con debounce 300 m
 ## 5. Condivisione del database tra i membri
 
 ### 5.1 Il proprietario
-`Famiglia → Google Drive & Sync → Collega Google Drive` → `ConnectSheet`:
+Al primo avvio il **Gate** (oppure, in modalità demo, `Famiglia → Google Drive & Sync → Collega Google Drive`) esegue il flusso `ConnectFlow`:
 1. **Accedi con Google** (popup o broker).
 2. `listCandidates()` cerca file con `properties mealduo=db` o nome `meal-duo…` accessibili all'app.
 3. Nessuno trovato → **Crea casa**: `engine.createHouse()` crea il file (`createFile`, multipart, `writersCanShare:false`) con un DB nuovo che contiene il proprietario (con la sua email) — oppure con i dati già presenti se si sceglie «Porta con me i dati».
@@ -141,7 +141,7 @@ Accede con il proprio account → `ConnectSheet`:
 - nessuna → «Hai ricevuto un invito?» → **Picker** (`pickDatabase`, vista «condivisi con me») → collegamento. Con `drive.file` questo gesto è ciò che concede all'app l'accesso a quel file.
 - (senza Picker) campo «Ho il link o l'ID»: funziona solo con scope completo o file già aperto con quell'account.
 
-Poi `IdentityGuard` associa l'account al membro. Dopo il collegamento il file è condiviso e il motore sincronizza come in §4.
+Poi `IdentityGuard` associa l'account al membro (e, se per un ritardo dell'invito esistono due membri con la stessa email, li unifica tenendo quello con il piano). Dopo il collegamento il file è condiviso e il motore sincronizza come in §4.
 
 ### 5.3 Rimozione
 Il proprietario: `Membri → Modifica → Rimuovi membro` → `drive.removeShare()` (revoca i permessi `writer` di quell'email) + tombstone del membro e del suo piano.
@@ -263,21 +263,23 @@ Poi **Settings → Pages → Source: GitHub Actions** e rilancia il deploy.
 
 ---
 
-## 10. Differenze rispetto a MoneyDuo
+## 10. Allineamento con MoneyDuo
 
 | Aspetto | MoneyDuo | Meal Duo |
 |---|---|---|
-| Avvio | **Gate** a schermo intero: senza `fileId` non si entra | **Demo/locale subito**; il collegamento è un foglio (`ConnectSheet`) |
-| Sessione scaduta con casa collegata | Overlay che blocca l'app finché non si rientra | **Non bloccante**: dati visibili, pillola «Accedi» |
-| Merge | `mergeDb` di MoneyDuo | LWW per record con tombstone e `by` (nuovo, con test di commutatività) |
-| Concorrenza in scrittura | lettura versione → carica | come MoneyDuo **+ secondo `getMeta` prima del PATCH** con ripetizione |
-| Notifiche | transazioni e conti | spese extra, spunte (raggruppate/sostitutive per `tag`), modifiche al proprio piano |
-| Apple Wallet | sì (Worker `/wallet/*`) | **non portato** (specifico di MoneyDuo) |
-| Selettore cartella | `FolderPicker` interno + Picker | solo Picker (altrimenti radice di Drive) |
-| i18n | catalogo it/en | solo italiano (`lib/text.ts` per i segnaposto) |
-| Service worker | `public/sw.js` scritto a mano | Workbox (`vite-plugin-pwa`) + `public/push-sw.js` via `importScripts` |
+| Avvio | **Gate** a schermo intero: senza `fileId` non si entra | **Uguale**: `Gate` (`components/Gate.tsx`). Unica aggiunta: «Prova senza account (dati demo)», perché la demo era un requisito di Meal Duo (`lib/localMode.ts`). Chi ha già dati locali non vede il Gate |
+| Sessione scaduta con casa collegata | Overlay che blocca l'app finché non si rientra | **Uguale**: overlay `login-overlay` (z-100) con `Gate reconnect`; l'app resta montata sotto con `inert` |
+| Selettore cartella | `FolderPicker` interno + Picker | **Uguale**: `FolderPicker` (esplora/crea cartelle) quando il Picker non è configurato, altrimenti Picker; in più «Sposta il database» (`engine.moveTo`) nella scheda Sincronizzazione |
+| Lingue | catalogo it/en | **Uguale**: `src/i18n` (`t`, `tb`, `tp`, `dayShort/dayLong`, `locale`), `en.ts`, selettore Automatico/Italiano/English, test di copertura |
+| Service worker | `public/sw.js` scritto a mano | Workbox (`vite-plugin-pwa`) + `public/push-sw.js` con gli stessi gestori `push`/`notificationclick` (stesso comportamento: niente notifica con l'app in primo piano, `postMessage` per sincronizzare subito). La differenza è solo nel *come* si fa il caching |
+| Apple Wallet | sì (Worker `/wallet/*`) | **Non portato** (specifico di MoneyDuo) |
 
----
+**Dove Meal Duo resta volutamente diverso** (non sono lacune da colmare):
+- **Merge:** MoneyDuo ha il suo `mergeDb` sul modello transazioni/conti; Meal Duo ha un merge LWW per record con tombstone e `by` sul *suo* modello (piani, catalogo, spunte), con test di commutatività e idempotenza.
+- **Concorrenza in scrittura:** MoneyDuo legge la versione e carica; Meal Duo fa **in più** un secondo `getMeta` prima del `PATCH` e ripete il merge (max 3 volte).
+- **Notifiche:** gli eventi dipendono dal dominio (spese extra, spunte, modifica del proprio piano invece di transazioni e conti).
+- **Membri duplicati per email:** `dedupeMembersByEmail` unifica chi accede prima che l'invito arrivi su Drive; l'invito viene inoltre caricato subito (`syncNow`).
+- **Conferme distruttive:** pulsanti a due tocchi (regola del Design System) invece del dialogo `ask()`.
 
 ## 11. Mappa dei file
 
@@ -291,7 +293,8 @@ Poi **Settings → Pages → Source: GitHub Actions** e rilancia il deploy.
 | Push (client) | `src/sync/push.ts`, `pushQueue.ts` |
 | Cache IndexedDB | `src/state/cache.ts` |
 | Store, notifiche, coda | `src/state/store.tsx`, `src/lib/notifications.ts` |
-| UI | `ConnectSheet`, `IdentityGuard`, `SyncCard`, `NotificationsCard`, `Notifications`, `Chrome` (pillola+campanella), `FamilyView` (membri/inviti) |
+| UI | `Gate`, `ConnectSheet` (flusso di collegamento), `FolderPicker`, `IdentityGuard`, `SyncCard`, `NotificationsCard`, `Notifications`, `Chrome` (pillola+campanella), `FamilyView` (membri/inviti), `App.tsx` (`Root`: Gate / overlay di riconnessione) |
+| Lingue | `src/i18n/{index,en,rich}.ts`, `src/lib/text.ts` |
 | Merge / DB | `src/services/merge.ts`, `dbOps.ts`, `dbSchema.ts` |
 | Service worker push | `public/push-sw.js`, `vite.config.ts` (`importScripts`) |
 | Worker | `worker/src/{index,auth,webpush}.ts`, `worker/scripts/*.mjs`, `worker/wrangler.example.toml`, `worker/README.md` |
@@ -299,8 +302,8 @@ Poi **Settings → Pages → Source: GitHub Actions** e rilancia il deploy.
 
 ## 12. Cosa è stato verificato (e cosa no)
 
-**Verificato automaticamente (128 test):** merge (commutatività, idempotenza, tombstone), motore di sync con Drive simulato (push, merge bidirezionale, race GET→PATCH, sola lettura, offline, copia persa/datata, creazione/collegamento casa), notifiche, coda push, cifratura RFC 8291, VAPID, endpoint del Worker (subscribe/notify/auth), service worker push.
+**Verificato automaticamente (150 test):** merge (commutatività, idempotenza, tombstone), motore di sync con Drive simulato (push, merge bidirezionale, race GET→PATCH, sola lettura, offline, copia persa/datata, creazione/collegamento casa), notifiche, coda push, cifratura RFC 8291, VAPID, endpoint del Worker (subscribe/notify/auth), service worker push.
 
-**Verificato in browser (Playwright, due dispositivi, Drive e Worker simulati):** Anna accede con sessione persistente → crea la casa → invita Bruno (permesso `writer` su Drive) → Bruno accede, la casa viene trovata e collegata da sola, nessun membro duplicato → Bruno aggiunge una voce extra → viene scritta su Drive con l'autore, il Worker riceve la richiesta di push per Anna → Anna sincronizza e vede la notifica nella campanella.
+**Verificato in browser (Playwright, due dispositivi, Drive e Worker simulati):** Anna parte dal **Gate** e accede con sessione persistente → crea la casa → invita Bruno (permesso `writer` su Drive) → Bruno accede, la casa viene trovata e collegata da sola, nessun membro duplicato → Bruno aggiunge una voce extra → viene scritta su Drive con l'autore, il Worker riceve la richiesta di push per Anna → Anna sincronizza e vede la notifica nella campanella → la sua sessione viene revocata: compare l'**overlay di riconnessione** → ritorno dal login col Worker (sessione nel frammento dell'URL) e l'app riprende. In un altro test: primo avvio in inglese → «Prova senza account» → nessuna parola italiana nell'interfaccia → cambio lingua immediato.
 
 **Non verificato:** OAuth e Drive reali con un Client ID (serve il tuo progetto Cloud), Picker reale, deploy reale del Worker su Cloudflare, push ricevuto su iOS/Android reali. Sono i primi passi da fare dopo il setup di §8.

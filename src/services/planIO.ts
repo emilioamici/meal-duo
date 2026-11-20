@@ -14,6 +14,7 @@ import { DEFAULT_MEALS, emptyDay, ensureFood, foodById, replacePlan } from './db
 import { normalizeName } from '../lib/foodMatch'
 import { cleanUnit } from '../lib/units'
 import { nowIso, uid } from '../lib/ids'
+import { t } from '../i18n'
 
 export const PLAN_FORMAT = 'meal-duo-plan'
 
@@ -60,47 +61,47 @@ export function parsePlanJson(text: string): ParseResult {
   try {
     raw = JSON.parse(text)
   } catch (e) {
-    return { ok: false, errors: [`JSON non valido: ${(e as Error).message}`], warnings }
+    return { ok: false, errors: [t('JSON non valido: {m}', { m: (e as Error).message })], warnings }
   }
-  if (!isObj(raw)) return { ok: false, errors: ['La radice del file deve essere un oggetto JSON.'], warnings }
-  if (raw.format !== undefined && raw.format !== PLAN_FORMAT) warnings.push(`Campo "format" inatteso ("${String(raw.format)}"): atteso "${PLAN_FORMAT}".`)
+  if (!isObj(raw)) return { ok: false, errors: [t('La radice del file deve essere un oggetto JSON.')], warnings }
+  if (raw.format !== undefined && raw.format !== PLAN_FORMAT) warnings.push(t('Campo "format" inatteso ("{f}"): atteso "{e}".', { f: String(raw.format), e: PLAN_FORMAT }))
 
   // days: array di {day, meals} oppure oggetto { lunedì: {meals} | [meals] }
   const entries: [unknown, unknown, string][] = []
   if (Array.isArray(raw.days)) raw.days.forEach((d, i) => entries.push([isObj(d) ? d.day ?? i : i, d, `days[${i}]`]))
   else if (isObj(raw.days)) Object.entries(raw.days).forEach(([k, d]) => entries.push([k, d, `days.${k}`]))
-  else return { ok: false, errors: ['Manca il campo "days" (array di 7 giorni oppure oggetto indicizzato per nome del giorno).'], warnings }
+  else return { ok: false, errors: [t('Manca il campo "days" (array di 7 giorni oppure oggetto indicizzato per nome del giorno).')], warnings }
 
   const days: ParsedMeal[][] = DAY_INDEXES.map(() => [])
   const seen = new Set<DayIndex>()
   for (const [dayKey, d, path] of entries) {
     const idx = parseDayName(dayKey)
-    if (idx === undefined) { errors.push(`${path}: giorno non riconosciuto (${JSON.stringify(dayKey)}). Usa Lunedì…Domenica.`); continue }
-    if (seen.has(idx)) { errors.push(`${path}: il giorno ${DAY_LONG[idx]} compare più volte.`); continue }
+    if (idx === undefined) { errors.push(t('{path}: giorno non riconosciuto ({day}). Usa Lunedì…Domenica.', { path, day: JSON.stringify(dayKey) })); continue }
+    if (seen.has(idx)) { errors.push(t('{path}: il giorno {day} compare più volte.', { path, day: DAY_LONG[idx] })); continue }
     seen.add(idx)
     const mealsRaw = Array.isArray(d) ? d : isObj(d) ? d.meals : undefined
-    if (!Array.isArray(mealsRaw)) { errors.push(`${path}: manca "meals" (array di pasti).`); continue }
+    if (!Array.isArray(mealsRaw)) { errors.push(t('{path}: manca "meals" (array di pasti).', { path })); continue }
     mealsRaw.forEach((m, mi) => {
       const mp = `${path}.meals[${mi}]`
-      if (!isObj(m) || typeof m.name !== 'string' || !m.name.trim()) { errors.push(`${mp}: il pasto richiede un "name" non vuoto.`); return }
-      if (!Array.isArray(m.items)) { errors.push(`${mp}: manca "items" (array di alimenti).`); return }
+      if (!isObj(m) || typeof m.name !== 'string' || !m.name.trim()) { errors.push(t('{path}: il pasto richiede un "name" non vuoto.', { path: mp })); return }
+      if (!Array.isArray(m.items)) { errors.push(t('{path}: manca "items" (array di alimenti).', { path: mp })); return }
       const items: ParsedItem[] = []
       m.items.forEach((it, ii) => {
         const ip = `${mp}.items[${ii}]`
-        if (!isObj(it) || typeof it.name !== 'string' || !it.name.trim()) { errors.push(`${ip}: l'alimento richiede un "name" non vuoto.`); return }
+        if (!isObj(it) || typeof it.name !== 'string' || !it.name.trim()) { errors.push(t('{path}: l\'alimento richiede un "name" non vuoto.', { path: ip })); return }
         const q = parseQuantity(it.quantity)
-        if (q === undefined || q <= 0) { errors.push(`${ip} (${it.name}): "quantity" deve essere un numero maggiore di 0.`); return }
+        if (q === undefined || q <= 0) { errors.push(t('{path} ({name}): "quantity" deve essere un numero maggiore di 0.', { path: ip, name: String(it.name) })); return }
         let unit = 'g'
         if (typeof it.unit === 'string' && it.unit.trim()) unit = cleanUnit(it.unit)
-        else warnings.push(`${ip} (${it.name}): unità mancante, uso "g".`)
+        else warnings.push(t('{path} ({name}): unità mancante, uso "g".', { path: ip, name: String(it.name) }))
         items.push({ name: it.name.trim(), quantity: q, unit })
       })
       days[idx].push({ name: m.name.trim(), items })
     })
   }
-  if (seen.size === 0 && errors.length === 0) errors.push('Il piano non contiene alcun giorno.')
+  if (seen.size === 0 && errors.length === 0) errors.push(t('Il piano non contiene alcun giorno.'))
   const missing = DAY_INDEXES.filter((i) => !seen.has(i)).map((i) => DAY_LONG[i])
-  if (missing.length && seen.size > 0) warnings.push(`Giorni non presenti (resteranno vuoti): ${missing.join(', ')}.`)
+  if (missing.length && seen.size > 0) warnings.push(t('Giorni non presenti (resteranno vuoti): {days}.', { days: missing.join(', ') }))
 
   return { ok: errors.length === 0, errors, warnings, plan: errors.length ? undefined : { member: typeof raw.member === 'string' ? raw.member : undefined, days } }
 }
@@ -148,11 +149,11 @@ export function applyImport(db: AppDatabase, memberId: string, parsed: ParsedPla
 
 /* ---------------- Export ---------------- */
 
-const INSTRUCTIONS = [
-  'Piano settimanale Meal Duo. Compila "days" da Lunedì a Domenica; ogni giorno ha dei pasti e ogni pasto una lista di alimenti.',
-  'Ogni alimento: "name" (testo), "quantity" (numero > 0) e "unit" (g, kg, ml, l, pz, cucchiaio, …).',
-  'I nomi vengono associati al catalogo alimenti della casa (es. "pollo" → "Petto di pollo"), così la spesa somma le quantità correttamente.',
-  'Puoi aggiungere pasti extra: basta un nuovo elemento in "meals". I campi che iniziano con "_" sono ignorati.',
+const instructions = () => [
+  t('Piano settimanale Meal Duo. Compila "days" da Lunedì a Domenica; ogni giorno ha dei pasti e ogni pasto una lista di alimenti.'),
+  t('Ogni alimento: "name" (testo), "quantity" (numero > 0) e "unit" (g, kg, ml, l, pz, cucchiaio, …).'),
+  t('I nomi vengono associati al catalogo alimenti della casa (es. "pollo" → "Petto di pollo"), così la spesa somma le quantità correttamente.'),
+  t('Puoi aggiungere pasti extra: basta un nuovo elemento in "meals". I campi che iniziano con "_" sono ignorati.'),
 ]
 
 export function exportPlan(db: AppDatabase, memberId: string): unknown {
@@ -186,8 +187,8 @@ export function planTemplate(kind: 'empty' | 'example'): unknown {
   return {
     format: PLAN_FORMAT,
     version: 1,
-    _istruzioni: INSTRUCTIONS,
-    member: kind === 'example' ? 'Nome membro' : '',
+    _istruzioni: instructions(),
+    member: kind === 'example' ? t('Nome membro') : '',
     days: DAY_INDEXES.map((i) => ({
       day: DAY_LONG[i],
       meals: DEFAULT_MEALS.map((name) => ({

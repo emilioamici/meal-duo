@@ -5,13 +5,14 @@ import { Sheet } from './ui'
 import { useStore } from '../state/store'
 import { useUi } from '../state/ui'
 import type { Notif } from '../lib/notifications'
+import { t, locale } from '../i18n'
 
 const ago = (iso: string): string => {
   const m = Math.round((Date.now() - new Date(iso).getTime()) / 60000)
-  if (m < 1) return 'ora'
-  if (m < 60) return `${m} min fa`
-  if (m < 1440) return `${Math.round(m / 60)} h fa`
-  return new Intl.DateTimeFormat('it-IT', { day: 'numeric', month: 'short' }).format(new Date(iso))
+  if (m < 1) return t('ora')
+  if (m < 60) return t('{n} min fa', { n: m })
+  if (m < 1440) return t('{n} h fa', { n: Math.round(m / 60) })
+  return new Intl.DateTimeFormat(locale(), { day: 'numeric', month: 'short' }).format(new Date(iso))
 }
 
 const Icon = ({ n }: { n: Notif }) => (
@@ -30,12 +31,12 @@ export function NotificationCenter() {
     if (n.kind === 'plan') { if (n.memberId) setMemberId(n.memberId); if (n.day !== undefined) setDay(n.day); setTab('today') } else setTab('shop')
   }
   return (
-    <Sheet open={centerOpen} onClose={() => setCenterOpen(false)} title="Notifiche">
+    <Sheet open={centerOpen} onClose={() => setCenterOpen(false)} title={t('Notifiche')}>
       {notifications.length === 0 ? (
         <div className="py-10 text-center text-sm text-muted">
           <MascotImg kind="mochi" className="mx-auto mb-3 h-20 w-auto" />
-          <p className="font-semibold text-ink">Nessuna notifica</p>
-          <p className="mx-auto mt-1 max-w-xs">Ti avviso quando un altro membro aggiunge una voce alla spesa, spunta un articolo o modifica il tuo piano.</p>
+          <p className="font-semibold text-ink">{t('Nessuna notifica')}</p>
+          <p className="mx-auto mt-1 max-w-xs">{t('Ti avviso quando un altro membro aggiunge una voce alla spesa, spunta un articolo o modifica il tuo piano.')}</p>
         </div>
       ) : (
         <>
@@ -49,14 +50,14 @@ export function NotificationCenter() {
                     <span className="block text-xs text-muted">{n.body}</span>
                     <span className="mt-0.5 block text-[11px] text-muted">{ago(n.at)}</span>
                   </span>
-                  {!n.read && <span className="mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full bg-brand" aria-label="Non letta" />}
+                  {!n.read && <span className="mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full bg-brand" aria-label={t('Non letta')} />}
                 </button>
               </li>
             ))}
           </ul>
           <div className="mt-3 flex gap-2">
-            <button className="glass-btn flex-1" disabled={unread === 0} onClick={markAllRead}>Segna tutte come lette</button>
-            <button className="glass-btn" onClick={clearNotifications}>Svuota</button>
+            <button className="glass-btn flex-1" disabled={unread === 0} onClick={markAllRead}>{t('Segna tutte come lette')}</button>
+            <button className="glass-btn" onClick={clearNotifications}>{t('Svuota')}</button>
           </div>
         </>
       )}
@@ -78,7 +79,7 @@ export function NotificationToast() {
             <Icon n={toast} />
             <span className="min-w-0"><span className="block text-sm font-bold">{toast.title}</span><span className="block truncate text-xs text-muted">{toast.body}</span></span>
           </button>
-          <button className="rounded-full p-1 text-muted active:bg-line/60" aria-label="Chiudi" onClick={dismissToast}><X size={16} /></button>
+          <button className="rounded-full p-1 text-muted active:bg-line/60" aria-label={t('Chiudi')} onClick={dismissToast}><X size={16} /></button>
         </motion.div>
       )}
     </AnimatePresence>

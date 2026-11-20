@@ -6,6 +6,7 @@ import { useStore } from '../state/store'
 import { engine, type SyncStatus } from '../sync/engine'
 import { useUi, type Tab } from '../state/ui'
 import { useOverlay } from '../state/overlay'
+import { t } from '../i18n'
 
 /* ---------- Sfondo vivo: 3 blob sfocati animati con sole transform (§1.4) ---------- */
 export function Background() {
@@ -31,11 +32,11 @@ export function BottomNav({ shopBadge }: { shopBadge: number }) {
   const { tab, setTab } = useUi()
   return (
     <nav className="glass absolute inset-x-4 bottom-4 z-40 flex items-center justify-between !rounded-full p-1.5"
-      style={{ marginBottom: 'env(safe-area-inset-bottom)' }} aria-label="Navigazione principale">
+      style={{ marginBottom: 'env(safe-area-inset-bottom)' }} aria-label={t('Navigazione principale')}>
       {TABS.map(({ id, label, icon: Icon }) => {
         const active = tab === id
         return (
-          <button key={id} onClick={() => setTab(id)} aria-label={label} aria-current={active ? 'page' : undefined}
+          <button key={id} onClick={() => setTab(id)} aria-label={t(label)} aria-current={active ? 'page' : undefined}
             className="relative flex flex-1 flex-col items-center gap-0.5 rounded-full py-2 transition active:scale-90">
             {active && (
               <motion.span layoutId="nav-drop" className="glass-active absolute inset-0 rounded-full"
@@ -47,7 +48,7 @@ export function BottomNav({ shopBadge }: { shopBadge: number }) {
                 <span className="absolute -right-2.5 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-exp px-1 text-[10px] font-bold text-onbrand">{shopBadge}</span>
               )}
             </span>
-            <span className={`relative text-[10px] font-semibold ${active ? 'text-brand' : 'text-muted'}`}>{label}</span>
+            <span className={`relative text-[10px] font-semibold ${active ? 'text-brand' : 'text-muted'}`}>{t(label)}</span>
           </button>
         )
       })}
@@ -91,9 +92,9 @@ export function SyncPill() {
     void engine.syncNow()
   }
   return (
-    <button onClick={onClick} className={`glass-btn !px-3 !py-1.5 text-xs ${s.cls}`} aria-label={`Sincronizzazione: ${s.label}. Tocca per ${sync.fileId ? 'sincronizzare' : 'collegare Google Drive'}`}>
+    <button onClick={onClick} className={`glass-btn !px-3 !py-1.5 text-xs ${s.cls}`} aria-label={t(sync.fileId ? 'Sincronizzazione: {s}. Tocca per sincronizzare' : 'Sincronizzazione: {s}. Tocca per collegare Google Drive', { s: t(s.label) })}>
       <Icon size={15} className={sync.status === 'syncing' ? 'animate-spin' : ''} />
-      <span>{s.label}</span>
+      <span>{t(s.label)}</span>
     </button>
   )
 }
@@ -101,7 +102,7 @@ export function SyncPill() {
 export function NotificationBell() {
   const { unread, setCenterOpen } = useStore()
   return (
-    <button className="glass-btn relative !h-9 !w-9 !p-0" aria-label={unread ? `Notifiche (${unread} non lette)` : 'Notifiche'} onClick={() => setCenterOpen(true)}>
+    <button className="glass-btn relative !h-9 !w-9 !p-0" aria-label={unread ? t('Notifiche ({n} non lette)', { n: unread }) : t('Notifiche')} onClick={() => setCenterOpen(true)}>
       <Bell size={17} />
       {unread > 0 && <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-exp px-1 text-[10px] font-bold text-onbrand">{unread > 9 ? '9+' : unread}</span>}
     </button>

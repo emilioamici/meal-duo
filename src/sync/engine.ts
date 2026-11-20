@@ -276,7 +276,7 @@ export class SyncEngine {
     if (!this.p.email) await this.loadProfile()
     const email = this.p.email ?? ''
     const local = this.host!.getDb()
-    const fresh = emptyDb(opts.houseName.trim() || 'La nostra casa', opts.memberName.trim() || 'Io', email)
+    const fresh = emptyDb(opts.houseName.trim() || t('La nostra casa'), opts.memberName.trim() || 'Io', email)
     const keep = opts.keepLocal && !isPristine(local)
     const db: Db = keep ? { ...local, houseName: fresh.houseName, lastUpdated: nowIso() } : { ...fresh, lastUpdated: nowIso() }
     const f = await drive.createFile(token, JSON.stringify(db), DB_FILE_NAME, opts.folderId)
@@ -321,6 +321,28 @@ export class SyncEngine {
   async revoke(email: string): Promise<boolean> {
     if (!this.p.fileId) return false
     return drive.removeShare(await this.token(), this.p.fileId, email.trim())
+  }
+
+  /** Nome della cartella che contiene il file (null se non visibile, es. file condiviso da altri). */
+  async currentFolder(): Promise<{ id: string; name: string } | null> {
+    if (!this.p.fileId) return null
+    const token = await this.token()
+    const meta = await drive.getMeta(token, this.p.fileId)
+    const id = meta.parents?.[0]
+    return id ? { id, name: await drive.folderName(token, id).catch(() => t('Cartella')) } : null
+  }
+  async listFolders(parentId: string): Promise<drive.DriveFolder[]> {
+    return drive.listFolders(await this.token(), parentId)
+  }
+  async createFolder(name: string, parentId: string): Promise<drive.DriveFolder> {
+    return drive.createFolder(await this.token(), name, parentId)
+  }
+  /** Sposta il database in un'altra cartella (solo il proprietario). */
+  async moveTo(folderId: string): Promise<void> {
+    if (!this.p.fileId) return
+    const token = await this.token()
+    const meta = await drive.getMeta(token, this.p.fileId)
+    await drive.moveFile(token, this.p.fileId, folderId, meta.parents ?? [])
   }
 
   /** Selettore di Google: il database della casa (anche condiviso da altri). Solo con il permesso `drive.file`. */

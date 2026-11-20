@@ -9,7 +9,9 @@
 - Funziona **offline** (cache locale + service worker) e si sincronizza da sola.
 - Stile **Liquid Glass** come da `DESIGN_SYSTEM.md` (temi Mochi chiaro / Zenitsu scuro).
 
-> **Modalità demo:** al primo avvio l'app contiene i dati di esempio di due persone (Emilio e Sara) e funziona subito, senza login Google.
+> **Primo avvio:** come in MoneyDuo si parte dal **Gate** (accesso con Google → la casa viene trovata o creata). Chi vuole solo provare l'app può toccare **«Prova senza account»**: contiene i dati di esempio di due persone (Emilio e Sara) e funziona subito, senza login Google.
+>
+> **Lingue:** italiano e inglese (automatico dal dispositivo, cambiabile da Famiglia → Aspetto).
 
 ---
 
@@ -74,8 +76,10 @@ src/
 │  ├─ dbOps.ts · dbSchema.ts     mutazioni immutabili e validazione del DB
 │  └─ planIO.ts                  import/export JSON del piano
 ├─ lib/                          foodMatch (fuzzy), units, notifications (chi avvisare e cosa), theme, actor…
+├─ i18n/                         t()/tb()/tp(), dizionario inglese (en.ts) e test di copertura
 ├─ state/                        store (DB + cache IndexedDB + notifiche), cache, ui, overlay
-├─ components/                   ui, Chrome, Mascots, Sheets, ConnectSheet, IdentityGuard, SyncCard,
+├─ components/                   ui, Chrome, Mascots, Sheets, Gate, ConnectSheet (flusso di collegamento), FolderPicker,
+│                                IdentityGuard, SyncCard,
 │                                NotificationsCard, Notifications …
 └─ views/                        TodayView, WeekView, ShoppingView, FamilyView
 worker/                          Cloudflare Worker: broker OAuth (accesso persistente) + push (vedi worker/README.md)
@@ -117,7 +121,11 @@ L'app non ha un backend: ogni utente accede con il proprio account Google e l'ap
 
 ## 4. Accesso, condivisione e inviti
 
-Meal Duo funziona subito in locale (dati demo). Per condividere la casa: **Famiglia → Google Drive & Sync → Collega Google Drive** (oppure tocca la pillola «Locale» in alto a destra).
+**Gate.** Senza una casa collegata l'app mostra a schermo intero la schermata di accesso (come MoneyDuo): **Accedi con Google** → l'app cerca il database e lo collega, oppure propone di crearlo. «Prova senza account (dati demo)» è l'unica uscita: l'app resta in locale e la casa si può collegare in seguito da **Famiglia → Google Drive & Sync** (o dalla pillola «Locale»).
+
+**Sessione scaduta.** Con una casa collegata, se la sessione Google non è più valida (e sei online) il Gate di riconnessione **copre tutta l'app** e i dati restano nascosti finché non accedi; l'app resta montata sotto, inerte, così quello che stavi scrivendo non si perde. Offline si resta sui dati locali.
+
+**Cartella del database.** Alla creazione della casa e poi da *Google Drive & Sync → Cartella del database → Sposta* (solo il proprietario) si sceglie dove sta il file: con il Picker attivo si usa il selettore di Google, altrimenti l'esplora-cartelle interno (cartelle del tuo Drive, «Nuova cartella qui»).
 
 ### Chi crea la casa (proprietario)
 1. **Accedi con Google** → l'app cerca un database `meal-duo-db.json` che l'account può vedere.
@@ -252,7 +260,7 @@ L'icona definitiva (i due gattini con le borse della spesa) è in `assets/icon-s
 
 ## 9. Test
 
-`npm test` esegue 128 test (Vitest) che coprono:
+`npm test` esegue 150 test (Vitest) che coprono:
 
 - **Motore della spesa:** somme tra membri/giorni, conversione kg→g e l→ml, unità incompatibili su righe separate, errori di virgola mobile, esclusione di membri e giorni (singoli e combinati), tombstone, immutabilità dell'input, spunte stabili al cambio filtri, «Nuova spesa», progresso.
 - **Fuzzy matching** (`pollo` → `Petto di pollo`, plurali, typo, alias, ambiguità) e unione dei duplicati con ridirezione delle voci dei piani.
@@ -260,9 +268,19 @@ L'icona definitiva (i due gattini con le borse della spesa) è in `assets/icon-s
 - **Import/export** (validazione con percorsi, round-trip export → import identico sulla spesa).
 - **Motore di sync** con Drive simulato: nessuna operazione se invariato, push, merge bidirezionale, **race condition** (scrittura altrui tra lettura e scrittura), sola lettura, offline, **copia locale persa/datata che non sovrascrive Drive**, creazione/collegamento della casa.
 - **Notifiche** (chi avvisare e cosa, raggruppamenti, mai per le proprie modifiche) e **coda push** (ordine, scarti, retry).
+- **i18n**: ogni testo usato nel codice ha la traduzione inglese, segnaposto e tag coerenti, nessun testo JSX lasciato fuori da `t()`; **Drive** (cartelle, spostamento, inviti, revoche, ricerca per marcatore); **membri duplicati** per email.
 - **Worker**: cifratura RFC 8291, VAPID, endpoint subscribe/notify/auth (sessioni cifrate, rinnovo, revoca), service worker push.
 
 > L'integrazione reale con Google (OAuth, Drive, Picker) richiede un Client ID e **non** è coperta da test automatici: è verificata contro un Drive e un Worker simulati (anche con due browser, inviti e notifiche inclusi); la prova con il proprio progetto Cloud va fatta a mano (§3).
+
+---
+
+## 9b. Lingue (it / en)
+
+I testi sono in italiano nel codice: `t('Testo italiano {nome}', { nome })` restituisce il testo nella lingua in uso; in inglese lo cerca in `src/i18n/en.ts` (la chiave è il testo italiano) e, se manca, ripiega sull'italiano. `tb()` accetta `<b>` e `<code>`, `tp(n, singolare, plurale)` gestisce i plurali, `dayShort/dayLong` i giorni, `locale()` date e numeri. Lingua: *Automatico* (segue il browser: italiano se `it`, altrimenti inglese), *Italiano*, *English* — da **Famiglia → Aspetto**; si applica subito, senza ricaricare.
+
+**Aggiungere un testo:** scrivilo con `t('…')` e aggiungi la voce in `en.ts`; `npm test` fallisce se manca la traduzione, se i segnaposto non coincidono o se resta testo JSX fuori da `t()`.
+**Non si traducono i dati dell'utente:** nomi di alimenti e pasti, nomi dei membri e della casa, e il formato JSON del piano (giorni in italiano; l'import accetta anche i nomi inglesi). Le notifiche push sono scritte nella lingua di chi fa la modifica.
 
 ---
 

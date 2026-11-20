@@ -11,9 +11,13 @@ import { OverlayCtx } from './state/overlay'
 import { ConnectSheet } from './components/ConnectSheet'
 import { IdentityGuard } from './components/IdentityGuard'
 import { NotificationCenter, NotificationToast } from './components/Notifications'
+import { useLang } from './i18n'
+import { Gate } from './components/Gate'
+import { isLocalMode } from './lib/localMode'
+import { isPristine } from './services/dbOps'
 import { buildShoppingList, shoppingProgress } from './services/shoppingListEngine'
 
-function Shell() {
+function AppShell() {
   const { tab } = useUi()
   const { db } = useStore()
   const { filters } = useUi()
@@ -60,12 +64,31 @@ function Shell() {
   )
 }
 
+/**
+ * Senza un database collegato si passa dal Gate (login Google); con il database collegato l'app funziona anche offline.
+ * Sessione scaduta (con casa collegata): il Gate di riconnessione copre tutto e i dati non si vedono; l'app resta montata sotto,
+ * inerte, così quello che stavi scrivendo non si perde e dopo l'accesso si riprende da dove si era.
+ */
+function Root() {
+  const { sync, db } = useStore()
+  useLang() // al cambio lingua si ridisegna tutto
+  const [local, setLocal] = useState(() => isLocalMode() || !isPristine(db)) // chi ha già dati propri non vede il Gate
+  if (!sync.fileId && !local) return <><Background /><Gate onLocal={() => setLocal(true)} /></>
+  const locked = !!sync.fileId && sync.status === 'auth'
+  return (
+    <>
+      <div aria-hidden={locked || undefined} {...(locked ? { inert: true } : {})}><AppShell /></div>
+      {locked && <div className="fixed inset-0 z-[100] overflow-y-auto bg-bg" data-testid="login-overlay"><Gate reconnect /></div>}
+    </>
+  )
+}
+
 export default function App() {
   return (
     <MotionConfig reducedMotion="user">
       <StoreProvider>
         <UiProvider>
-          <Shell />
+          <Root />
         </UiProvider>
       </StoreProvider>
     </MotionConfig>

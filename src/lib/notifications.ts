@@ -1,5 +1,6 @@
 import type { AppDatabase, DayIndex } from '../types'
-import { DAY_INDEXES, DAY_LONG } from '../types'
+import { DAY_INDEXES } from '../types'
+import { dayLong, t, tp } from '../i18n'
 import { extraChecked, isChecked } from '../services/shoppingListEngine'
 import { nowIso } from './ids'
 
@@ -31,15 +32,15 @@ const GROUP_AFTER = 3 // oltre questa soglia, per autore, si manda un riepilogo 
  */
 export function diffNotifications(prev: AppDatabase, next: AppDatabase, me: string): Notif[] {
   const at = nowIso()
-  const who = (id?: string) => (id ? next.members.find((m) => m.id === id)?.name ?? 'Un membro' : 'Un membro')
-  const foodName = (key: string) => next.foodCatalog.find((f) => f.id === key.split('|')[0])?.name ?? 'Un articolo'
+  const who = (id?: string) => (id ? next.members.find((m) => m.id === id)?.name ?? t('Un membro') : t('Un membro'))
+  const foodName = (key: string) => next.foodCatalog.find((f) => f.id === key.split('|')[0])?.name ?? t('Un articolo')
   const out: Notif[] = []
 
   // ----- voci extra aggiunte
   const prevExtra = new Set(prev.shopping.extras.filter((e) => !e.deleted).map((e) => e.id))
   for (const e of next.shopping.extras) {
     if (e.deleted || prevExtra.has(e.id) || !e.by || e.by === me) continue
-    out.push({ id: `extra:${e.id}`, kind: 'extra', at, read: false, tag: `extra:${e.id}`, title: `${who(e.by)} ha aggiunto «${e.name}» alla spesa`, body: e.quantity ?? 'Voce extra' })
+    out.push({ id: `extra:${e.id}`, kind: 'extra', at, read: false, tag: `extra:${e.id}`, title: t('{who} ha aggiunto «{name}» alla spesa', { who: who(e.by), name: e.name }), body: e.quantity ?? t('Voce extra') })
   }
 
   // ----- articoli spuntati (raggruppati per autore)
@@ -57,8 +58,8 @@ export function diffNotifications(prev: AppDatabase, next: AppDatabase, me: stri
     const sorted = [...names].sort()
     out.push({
       id: `check:${by}:${sorted.join(',')}`, kind: 'check', at, read: false, tag: `check:${by}`,
-      title: sorted.length > GROUP_AFTER ? `${who(by)} ha spuntato ${sorted.length} articoli` : `${who(by)} ha preso ${sorted.join(', ')}`,
-      body: sorted.length > GROUP_AFTER ? sorted.slice(0, 3).join(', ') + '…' : 'Spunta aggiornata nella lista della spesa',
+      title: sorted.length > GROUP_AFTER ? t('{who} ha spuntato {n} articoli', { who: who(by), n: sorted.length }) : t('{who} ha preso {names}', { who: who(by), names: sorted.join(', ') }),
+      body: sorted.length > GROUP_AFTER ? sorted.slice(0, 3).join(', ') + '…' : t('Spunta aggiornata nella lista della spesa'),
     })
   }
 
@@ -76,8 +77,8 @@ export function diffNotifications(prev: AppDatabase, next: AppDatabase, me: stri
       const stamp = Math.max(...days.map((d) => Date.parse(nextPlan.days[d].updatedAt)))
       out.push({
         id: `plan:${me}:${by}:${days.join('')}:${stamp}`, kind: 'plan', at, read: false, tag: `plan:${me}:${by}`, memberId: me, day: days[0],
-        title: days.length > GROUP_AFTER ? `${who(by)} ha aggiornato il tuo piano` : `${who(by)} ha modificato il tuo piano`,
-        body: days.length > GROUP_AFTER ? `${days.length} giorni modificati` : days.map((d) => DAY_LONG[d]).join(', '),
+        title: days.length > GROUP_AFTER ? t('{who} ha aggiornato il tuo piano', { who: who(by) }) : t('{who} ha modificato il tuo piano', { who: who(by) }),
+        body: days.length > GROUP_AFTER ? tp(days.length, '{n} giorno modificato', '{n} giorni modificati', { n: days.length }) : days.map((d) => dayLong(d)).join(', '),
       })
     }
   }
