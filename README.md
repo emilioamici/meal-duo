@@ -207,7 +207,7 @@ Il workflow `.github/workflows/deploy.yml` esegue **test → build → deploy** 
 
 ## 8. Icona dell'app
 
-Attualmente `public/icons/*` e `public/favicon.png` / `apple-touch-icon.png` sono **segnaposto** (piatto e posate). Per sostituirli con l'icona definitiva:
+L'icona definitiva (i due gattini con le borse della spesa) è in `assets/icon-source.png`; da lì lo script genera tutte le icone PWA, riempiendo gli angoli bianchi con il verde menta. Per cambiarla in futuro:
 
 1. Salva l'immagine quadrata (ideale ≥ 1024 px) come **`assets/icon-source.png`**.
 2. Esegui:
@@ -271,6 +271,6 @@ Verificata con Playwright (iPhone 14, tema chiaro e scuro) e ispezione del codic
 
 - Integrazione Google non verificabile senza credenziali: provata solo con Drive simulato (§9).
 - Con `drive.file` il secondo membro deve usare il Picker (§4).
-- Mascotte e icona sono segnaposto in attesa delle immagini definitive.
+- Le mascotte dentro l'app (capolino) sono ancora segnaposto SVG; l'icona PWA è definitiva.
 - I token GIS durano ~1 ora: se scade e il rinnovo silenzioso è bloccato dal browser, la pillola mostra «Accedi» e basta un tocco.
 - `headRevisionId`/`version` rilevano le modifiche altrui ma non c'è locking: vedi la nota sulla finestra di race in §5.

@@ -45,15 +45,25 @@ def placeholder(size: int = 1024) -> Image.Image:
     return img
 
 
+def fill_corners(im: Image.Image) -> tuple[Image.Image, tuple[int, int, int]]:
+    """Le icone con angoli arrotondati hanno spesso gli angoli bianchi (JPEG): li riempie con il colore di sfondo
+    campionato al centro del bordo alto, così l'icona è a pieno riquadro (iOS/Android applicano la loro maschera)."""
+    from PIL import ImageDraw
+    im = im.convert("RGB")
+    fill = im.getpixel((im.width // 2, int(im.height * 0.04)))
+    for corner in [(0, 0), (im.width - 1, 0), (0, im.height - 1), (im.width - 1, im.height - 1)]:
+        ImageDraw.floodfill(im, corner, fill, thresh=40)
+    return im, fill
+
+
 def load() -> Image.Image:
+    global BG
     if SRC.exists():
-        im = Image.open(SRC).convert("RGBA")
+        im = Image.open(SRC)
         side = min(im.size)
         left, top = (im.width - side) // 2, (im.height - side) // 2
-        im = im.crop((left, top, left + side, top + side))
-        bg = Image.new("RGB", im.size, BG)
-        bg.paste(im, mask=im.split()[3])
-        return bg
+        im, BG = fill_corners(im.crop((left, top, left + side, top + side)))
+        return im
     print("assets/icon-source.png non trovato: uso l'icona segnaposto")
     return placeholder()
 
@@ -66,8 +76,9 @@ def main() -> None:
     resize(512).save(PUB / "icons" / "pwa-512.png")
     # maskable: contenuto nel 80% centrale (safe zone), bordo pieno del colore di sfondo
     canvas = Image.new("RGB", (512, 512), BG)
-    inner = src.resize((410, 410), Image.LANCZOS)
-    canvas.paste(inner, (51, 51))
+    m = int(src.width * 0.06)  # scarta il bordo arrotondato, altrimenti se ne intravede il contorno
+    inner = src.crop((m, m, src.width - m, src.height - m)).resize((440, 440), Image.LANCZOS)
+    canvas.paste(inner, (36, 36))
     canvas.save(PUB / "icons" / "pwa-maskable-512.png")
     resize(180).save(PUB / "apple-touch-icon.png")
     resize(64).save(PUB / "favicon.png")
