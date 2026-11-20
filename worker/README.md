@@ -106,7 +106,7 @@ Non serve altro (l'app usa lo stesso indirizzo del server delle notifiche). Sull
 - **«Origine non autorizzata»:** `ALLOWED_ORIGINS` deve contenere l'origine dell'app (per esempio `https://emilioamici.github.io`, senza percorso).
 
 ## Ponte per gli invitati (Clean Duo)
-Con lo scope `drive.file` gli invitati non vedono il file della famiglia. Il Worker espone `/house/register`, `/house/mine`, `/db/meta`, `/db/read`, `/db/write`: il proprietario registra la famiglia, gli invitati leggono/scrivono passando dal Worker, che ricontrolla a ogni richiesta i permessi su Drive (scrittura solo owner/writer). Richiede `KV`, `SESSION_KEY` e il client secret già usati per l'accesso persistente. Imposta `ALLOWED_CLIENT_IDS` con il Client ID dell'app (i token emessi per altre app sono rifiutati). `GET /health` risponde `{ok, auth, bridge}`.
+Con lo scope `drive.file` gli invitati non vedono il file della famiglia. Il Worker espone `/house/register`, `/house/mine`, `/db/meta`, `/db/read`, `/db/write`: il proprietario registra la famiglia, gli invitati leggono/scrivono passando dal Worker, che ricontrolla a ogni richiesta i permessi su Drive (scrittura solo owner/writer). Richiede `KV`, `SESSION_KEY` e il client secret già usati per l'accesso persistente. Sono accettati solo i token emessi per il tuo Client ID (`GOOGLE_CLIENT_ID`, già configurato): non serve altro. `ALLOWED_CLIENT_IDS` (facoltativa, elenco separato da virgole) serve solo per ammettere altri Client ID. `GET /health` risponde `{ok, auth, bridge}`.
 
 ## Se qualcosa non va
 - **«Origine non autorizzata» (403):** `ALLOWED_ORIGINS` non coincide con l'indirizzo del sito. Correggi `wrangler.toml` e rifai `npx wrangler deploy`.
