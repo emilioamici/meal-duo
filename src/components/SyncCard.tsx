@@ -17,7 +17,7 @@ const msg = (e: unknown) => (e instanceof Error ? e.message : String(e))
 
 /**
  * Stato della sincronizzazione e gestione dell'account (stessa scheda di MoneyDuo). Il collegamento alla famiglia avviene dal
- * Gate / dal foglio «Collega Google Drive»; l'ID del file non si mostra né si inserisce mai.
+ * Gate / dal foglio «Collega Google Drive»; l'ID famiglia (l'ID del file) lo copia il proprietario dalla scheda Famiglia.
  */
 export function SyncCard() {
   const { sync, cacheOk } = useStore()
@@ -42,6 +42,7 @@ export function SyncCard() {
         </div>
       </div>
       {sync.email && <p className="mb-3 flex items-center gap-2 text-sm text-muted"><UserRound size={15} />{sync.email}</p>}
+      {sync.bridged && <p className="mb-3 rounded-xl bg-bg/60 p-3 text-xs text-muted">{t('Sei entrato dall’invito: il database si apre dal server della famiglia (il Worker), senza selettore di Google.')}</p>}
 
       {sync.persistent ? (
         <p className="mb-3 flex items-start gap-2 rounded-xl bg-inc/15 p-3 text-sm"><ShieldCheck size={16} className="mt-0.5 shrink-0 text-inc" />{t('Accesso persistente attivo: la sessione Google si rinnova da sola, anche in background.')}</p>

@@ -105,6 +105,9 @@ Non serve altro (l'app usa lo stesso indirizzo del server delle notifiche). Sull
 - **Dopo 7 giorni chiede di nuovo l'accesso:** l'app è ancora in *Testing*; vedi il punto 1.1.
 - **«Origine non autorizzata»:** `ALLOWED_ORIGINS` deve contenere l'origine dell'app (per esempio `https://emilioamici.github.io`, senza percorso).
 
+## Ponte per gli invitati (Clean Duo)
+Con lo scope `drive.file` gli invitati non vedono il file della famiglia. Il Worker espone `/house/register`, `/house/mine`, `/db/meta`, `/db/read`, `/db/write`: il proprietario registra la famiglia, gli invitati leggono/scrivono passando dal Worker, che ricontrolla a ogni richiesta i permessi su Drive (scrittura solo owner/writer). Richiede `KV`, `SESSION_KEY` e il client secret già usati per l'accesso persistente. Imposta `ALLOWED_CLIENT_IDS` con il Client ID dell'app (i token emessi per altre app sono rifiutati). `GET /health` risponde `{ok, auth, bridge}`.
+
 ## Se qualcosa non va
 - **«Origine non autorizzata» (403):** `ALLOWED_ORIGINS` non coincide con l'indirizzo del sito. Correggi `wrangler.toml` e rifai `npx wrangler deploy`.
 - **«Sessione Google non valida» (401):** il token Google è scaduto; tocca *Riconnetti* nell'app e riprova.
@@ -125,4 +128,4 @@ node worker/scripts/generate-vapid.mjs
 Il Worker usa solo API standard (WebCrypto, fetch): gira anche in Node 20+. È stato provato anche sul runtime Cloudflare in locale (`wrangler dev`).
 
 ## Permesso ristretto
-Con il permesso ristretto `drive.file` l'app chiama `/auth/start?scope=file`: il token di rinnovo copre solo i file dell'app. Ripubblica il Worker e riattiva l'accesso persistente sui dispositivi.
+Meal Duo usa sempre il permesso ristretto `drive.file`: l'app chiama `/auth/start?scope=file`: il token di rinnovo copre solo i file dell'app. Ripubblica il Worker e riattiva l'accesso persistente sui dispositivi.

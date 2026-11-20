@@ -9,11 +9,11 @@ beforeEach(() => {
 afterEach(() => { vi.unstubAllGlobals(); vi.unstubAllEnvs() })
 
 describe('selettore di Google: configurazione e permesso richiesto', () => {
-  it('senza chiave e numero del progetto: tutto Drive, come prima', async () => {
+  it('senza chiave e numero del progetto: il permesso resta ristretto (drive.file), come in Clean Duo', async () => {
     const { pickerConfigured } = await import('./picker')
-    const { driveScope, DRIVE_FULL_SCOPE } = await import('./google')
+    const { driveScope, DRIVE_FILE_SCOPE } = await import('./google')
     expect(pickerConfigured()).toBe(false)
-    expect(driveScope()).toBe(DRIVE_FULL_SCOPE)
+    expect(driveScope()).toBe(DRIVE_FILE_SCOPE)
   })
   it('con entrambi i valori: solo drive.file', async () => {
     store.set('mealduo:googleApiKey', 'AIzaTest'); store.set('mealduo:googleAppId', '123456789')
@@ -32,9 +32,9 @@ describe('selettore di Google: configurazione e permesso richiesto', () => {
     const m = await import('./picker')
     expect(m.googleApiKey()).toBe('AIzaBuild'); expect(m.googleAppId()).toBe('999')
   })
-  it('il permesso ristretto non include l\'accesso a tutto Drive', async () => {
-    const { DRIVE_FILE_SCOPE, DRIVE_FULL_SCOPE } = await import('./google')
+  it('il permesso è esattamente drive.file (mai tutto Drive)', async () => {
+    const { DRIVE_FILE_SCOPE, driveScope } = await import('./google')
     expect(DRIVE_FILE_SCOPE).toBe('https://www.googleapis.com/auth/drive.file')
-    expect(DRIVE_FILE_SCOPE).not.toBe(DRIVE_FULL_SCOPE)
+    expect(driveScope()).toBe(DRIVE_FILE_SCOPE)
   })
 })

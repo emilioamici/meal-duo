@@ -67,7 +67,7 @@ src/
 │  ├─ google.ts                  Google Identity Services: token a popup (1 h) e scope
 │  ├─ auth.ts                    accesso persistente: sessione sul Worker, rinnovo token senza popup
 │  ├─ drive.ts                   Drive REST v3: ricerca/lettura/scrittura del file, inviti e revoche
-│  ├─ picker.ts                  Google Picker (scelta del file/cartella con scope drive.file)
+│  ├─ picker.ts                  Google Picker (scelta del file, ristretto a un solo file se serve)
 │  ├─ engine.ts                  motore di sync: versione remota, merge, ricontrollo, riconnessione
 │  ├─ push.ts · pushQueue.ts     iscrizione push e coda delle notifiche da inviare
 ├─ services/
@@ -78,7 +78,7 @@ src/
 ├─ lib/                          foodMatch (fuzzy), units, notifications (chi avvisare e cosa), theme, actor…
 ├─ i18n/                         t()/tb()/tp(), dizionario inglese (en.ts) e test di copertura
 ├─ state/                        store (DB + cache IndexedDB + notifiche), cache, ui, overlay
-├─ components/                   ui, Chrome, Mascots, Sheets, Gate, ConnectSheet (flusso di collegamento), FolderPicker,
+├─ components/                   ui, Chrome, Mascots, Sheets, Gate, ConnectSheet (flusso di collegamento),
 │                                IdentityGuard, SyncCard,
 │                                NotificationsCard, Notifications …
 └─ views/                        TodayView, WeekView, ShoppingView, SettingsView
@@ -147,14 +147,19 @@ La quarta scheda della barra si chiama **Impostazioni** e ha la stessa struttura
 
 ### Chi si unisce
 1. Apre l'app → **Collega Google Drive** → accede con *il proprio* account Google.
-2. Se l'app trova il file lo collega da sola. Altrimenti, nella schermata «Nessuna famiglia trovata», **Scegli il database della famiglia** (Picker): il file è in «Condivisi con me». Lo si fa una volta sola.
+2. Se l'app trova il file (direttamente o dal ponte del Worker) lo collega da sola. Altrimenti, nella schermata «Nessuna famiglia trovata», incolla l'**ID famiglia** o apri il link d'invito; se serve, **Scegli il database della famiglia** (Picker).
 3. Se sul dispositivo ci sono dati propri l'app chiede se **unirli** al file o **usare solo il file**.
 4. **Chi sei?** — l'account viene associato al membro (l'invito ha già salvato la sua email; se il file è stato condiviso a mano si sceglie il membro o ci si aggiunge).
 
 Per **rimuovere** una persona: Membri → Modifica → *Rimuovi membro*: il proprietario revoca anche l'accesso al file su Drive.
 
-### ⚠️ Perché serve il Picker (e non basta l'ID)
-Con lo scope `drive.file`, Drive nega l'accesso (`404`) ai file creati da altri **anche se condivisi con te**, finché l'utente non li ha «aperti» con quell'app: il **Picker** è il modo ufficiale. Con API Key e App ID configurati (§3, passo 5) l'app chiede *solo* `drive.file`; senza, usa lo scope completo `drive` (vede i file condivisi, ma chiede un permesso molto più ampio). «Ho il link o l'ID» funziona solo con lo scope completo o se il file è già stato aperto con quell'account.
+### ID famiglia, link d'invito e accesso senza Picker
+Con lo scope `drive.file` Drive nega l'accesso (`404`) ai file creati da altri **anche se condivisi con te**, finché quell'app non li ha «aperti». Meal Duo usa **sempre e solo** `drive.file` e lo risolve come Clean Duo:
+
+- **ID famiglia**: è l'ID del file su Drive. Il proprietario lo copia da *Impostazioni → Famiglia*; chi entra può incollarlo in «ID famiglia» nella schermata di collegamento.
+- **Link d'invito**: l'email d'invito contiene un link `…#join=<ID famiglia>`; aprendolo (e accedendo) la famiglia si apre da sola.
+- **Ponte del Worker**: se il Worker è attivo, chi ha creato la famiglia la registra sul Worker (serve l'accesso persistente). Gli invitati, anche senza Picker né ID, leggono e scrivono il database **passando dal Worker**, che verifica a ogni richiesta che l'email sia tra i permessi del file su Drive (e con ruolo di scrittura per modificare). Togliere una persona da Drive le chiude subito anche il ponte.
+- **Senza ponte**: resta il Picker di Google, ristretto a quel solo file.
 
 ---
 

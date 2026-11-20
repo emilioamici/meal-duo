@@ -68,7 +68,7 @@ export function SettingsView() {
           <DataSection />
         </Accordion>
 
-        <p className="flex gap-2 px-1 pb-4 text-xs text-muted"><ShieldCheck size={16} className="shrink-0" /><span>{t('I dati restano nel tuo Google Drive e su questo dispositivo: nessun server di terze parti per i dati.')} · Meal Duo · <a className="font-semibold text-brand" href={import.meta.env.BASE_URL + 'privacy.html'}>{t('Informativa sulla privacy')}</a></span></p>
+        <p className="flex gap-2 px-1 pb-4 text-xs text-muted"><ShieldCheck size={16} className="shrink-0" /><span>{t('I dati restano nel tuo Google Drive e su questo dispositivo. Il server della famiglia (il tuo Cloudflare Worker) li fa solo transitare per gli invitati e non li conserva.')} · Meal Duo · <a className="font-semibold text-brand" href={import.meta.env.BASE_URL + 'privacy.html'}>{t('Informativa sulla privacy')}</a></span></p>
       </div>
     </>
   )

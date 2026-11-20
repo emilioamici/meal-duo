@@ -28,11 +28,6 @@ export interface DriveFile {
 
 export const FOLDER_MIME = 'application/vnd.google-apps.folder'
 
-export interface DriveFolder {
-  id: string
-  name: string
-}
-
 const FIELDS = 'id,name,version,modifiedTime,ownedByMe,owners(emailAddress,displayName),parents,properties,capabilities(canEdit,canShare)'
 const enc = encodeURIComponent
 
@@ -129,30 +124,6 @@ export const friendly = (e: DriveError): string =>
   e.status === 404 ? t('File non trovato o non accessibile all\'app.') : e.status === 403 ? t('Permesso negato da Drive: {m}', { m: e.message }) : t('Errore Google Drive ({status}): {message}', { status: e.status, message: e.message })
 
 // ---------- cartelle ----------
-
-/** Sottocartelle di una cartella ('root' = Il mio Drive). */
-export async function listFolders(token: string, parentId: string): Promise<DriveFolder[]> {
-  const out: DriveFolder[] = []
-  let page = ''
-  for (let i = 0; i < 5; i++) {
-    const query = enc(`mimeType = '${FOLDER_MIME}' and '${parentId}' in parents and trashed = false`)
-    const url = `${API}/files?q=${query}&orderBy=name&pageSize=100&fields=nextPageToken,files(id,name)&supportsAllDrives=true&includeItemsFromAllDrives=true${page ? `&pageToken=${enc(page)}` : ''}`
-    const j = (await (await call(token, url)).json()) as { files: DriveFolder[]; nextPageToken?: string }
-    out.push(...j.files)
-    if (!j.nextPageToken) break
-    page = j.nextPageToken
-  }
-  return out
-}
-
-export async function createFolder(token: string, name: string, parentId: string): Promise<DriveFolder> {
-  const r = await call(token, `${API}/files?fields=id,name&supportsAllDrives=true`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name, mimeType: FOLDER_MIME, ...(parentId !== 'root' ? { parents: [parentId] } : {}) }),
-  })
-  return r.json()
-}
 
 export async function folderName(token: string, id: string): Promise<string> {
   if (id === 'root') return t('Il mio Drive')
