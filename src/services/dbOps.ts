@@ -6,6 +6,7 @@ import { DAY_INDEXES } from '../types'
 import { nowIso, uid } from '../lib/ids'
 import { capitalize, findCanonical, guessCategory, normalizeName } from '../lib/foodMatch'
 import { cleanUnit } from '../lib/units'
+import { getActor } from '../lib/actor'
 
 export const DEFAULT_MEALS = ['Colazione', 'Spuntino mattina', 'Pranzo', 'Merenda', 'Cena']
 export const MEMBER_COLORS = ['#c9692a', '#2a8f78', '#c0506a', '#e0a93e', '#8a5fa8', '#3f87b8', '#6aa84f', '#5b6577']
@@ -20,9 +21,10 @@ export function emptyPlan(memberId: string, at: string = nowIso()): WeeklyPlan {
   return { memberId, updatedAt: at, days: DAY_INDEXES.map(() => emptyDay(at)) }
 }
 
-export function emptyDb(houseName = 'La nostra casa'): AppDatabase {
+/** Casa vuota con un solo membro (chi la crea). */
+export function emptyDb(houseName = 'La nostra casa', memberName = 'Io', email?: string): AppDatabase {
   const at = nowIso()
-  const member: Member = { id: uid('mem'), name: 'Io', color: MEMBER_COLORS[0], updatedAt: at }
+  const member: Member = { id: uid('mem'), name: memberName, color: MEMBER_COLORS[0], email: email || undefined, updatedAt: at }
   return {
     schema: 'meal-duo-db',
     version: 1,
@@ -36,6 +38,9 @@ export function emptyDb(houseName = 'La nostra casa'): AppDatabase {
 }
 
 const touch = (db: AppDatabase, at: string): AppDatabase => ({ ...db, lastUpdated: at })
+
+/** Il database è ancora quello di esempio / mai modificato (lastUpdated resta all'epoca). */
+export const isPristine = (db: AppDatabase): boolean => db.lastUpdated === EPOCH
 
 export const liveMembers = (db: AppDatabase): Member[] => db.members.filter((m) => !m.deleted)
 export const liveFoods = (db: AppDatabase): FoodCatalogItem[] => db.foodCatalog.filter((f) => !f.deleted)
@@ -150,8 +155,8 @@ export function removeMember(db: AppDatabase, id: string): AppDatabase {
 function mapDay(db: AppDatabase, memberId: string, day: DayIndex, fn: (d: DayPlan) => DayPlan): AppDatabase {
   const at = nowIso()
   const plan = db.plans[memberId] ?? emptyPlan(memberId, at)
-  const days = plan.days.map((d, i) => (i === day ? { ...fn(d), updatedAt: at } : d))
-  return touch({ ...db, plans: { ...db.plans, [memberId]: { ...plan, deleted: undefined, days, updatedAt: at } } }, at)
+  const days = plan.days.map((d, i) => (i === day ? { ...fn(d), updatedAt: at, by: getActor() } : d))
+  return touch({ ...db, plans: { ...db.plans, [memberId]: { ...plan, deleted: undefined, days, updatedAt: at, by: getActor() } } }, at)
 }
 
 export function addMeal(db: AppDatabase, memberId: string, day: DayIndex, name: string): AppDatabase {
@@ -200,25 +205,26 @@ export function clearDay(db: AppDatabase, memberId: string, day: DayIndex): AppD
 export function replacePlan(db: AppDatabase, memberId: string, days: DayPlan[]): AppDatabase {
   const at = nowIso()
   const stamped = DAY_INDEXES.map((i) => ({ ...(days[i] ?? emptyDay(at, [])), updatedAt: at }))
-  return touch({ ...db, plans: { ...db.plans, [memberId]: { memberId, updatedAt: at, days: stamped } } }, at)
+  const by = getActor()
+  return touch({ ...db, plans: { ...db.plans, [memberId]: { memberId, updatedAt: at, by, days: stamped.map((d) => ({ ...d, by })) } } }, at)
 }
 
 /* ---------------- Spesa ---------------- */
 
 export function toggleCheck(db: AppDatabase, key: string, checked: boolean, by?: string): AppDatabase {
   const at = nowIso()
-  return touch({ ...db, shopping: { ...db.shopping, checks: { ...db.shopping.checks, [key]: { key, checked, by, updatedAt: at } } } }, at)
+  return touch({ ...db, shopping: { ...db.shopping, checks: { ...db.shopping.checks, [key]: { key, checked, by: by ?? getActor(), updatedAt: at } } } }, at)
 }
 
 export function addExtra(db: AppDatabase, name: string, quantity?: string): AppDatabase {
   const at = nowIso()
-  const extra: ExtraItem = { id: uid('x'), name: capitalize(name), quantity: quantity?.trim() || undefined, checked: false, updatedAt: at }
+  const extra: ExtraItem = { id: uid('x'), name: capitalize(name), quantity: quantity?.trim() || undefined, checked: false, updatedAt: at, by: getActor() }
   return touch({ ...db, shopping: { ...db.shopping, extras: [...db.shopping.extras, extra] } }, at)
 }
 
 export function toggleExtra(db: AppDatabase, id: string, checked: boolean): AppDatabase {
   const at = nowIso()
-  return touch({ ...db, shopping: { ...db.shopping, extras: db.shopping.extras.map((e) => (e.id === id ? { ...e, checked, updatedAt: at } : e)) } }, at)
+  return touch({ ...db, shopping: { ...db.shopping, extras: db.shopping.extras.map((e) => (e.id === id ? { ...e, checked, updatedAt: at, by: getActor() } : e)) } }, at)
 }
 
 export function removeExtra(db: AppDatabase, id: string): AppDatabase {

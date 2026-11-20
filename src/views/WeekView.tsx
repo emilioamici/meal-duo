@@ -2,7 +2,7 @@ import { useMemo, useRef, useState } from 'react'
 import { motion } from 'framer-motion'
 import { ChevronRight, Copy, Download, FileJson, FileUp, Upload } from 'lucide-react'
 import { PageHeader, Sheet } from '../components/ui'
-import { SyncPill } from '../components/Chrome'
+import { HeaderActions } from '../components/Chrome'
 import { MascotPeek } from '../components/Mascots'
 import { MemberPills } from '../components/MemberPills'
 import { CopyDaySheet } from '../components/Sheets'
@@ -29,7 +29,7 @@ export function WeekView() {
 
   return (
     <>
-      <PageHeader title="Settimana" subtitle={`Piano di ${member.name}`} right={<SyncPill />} />
+      <PageHeader title="Settimana" subtitle={`Piano di ${member.name}`} right={<HeaderActions />} />
       <MemberPills members={members} value={member.id} onChange={setMemberId} />
 
       <div className="mt-2">

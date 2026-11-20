@@ -52,8 +52,10 @@ export default defineConfig({
         // Le API Google non vanno mai messe in cache dal service worker
         navigateFallbackDenylist: [/^\/api\//],
         cleanupOutdatedCaches: true,
+        // gestori delle notifiche push (public/push-sw.js), caricati dal service worker generato
+        importScripts: ['push-sw.js'],
       },
     }),
   ],
-  test: { environment: 'node', include: ['src/**/*.test.ts'] },
+  test: { environment: 'node', include: ['src/**/*.test.ts', 'worker/src/**/*.test.ts'] },
 })

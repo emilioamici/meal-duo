@@ -8,6 +8,9 @@ import { WeekView } from './views/WeekView'
 import { ShoppingView } from './views/ShoppingView'
 import { FamilyView } from './views/FamilyView'
 import { OverlayCtx } from './state/overlay'
+import { ConnectSheet } from './components/ConnectSheet'
+import { IdentityGuard } from './components/IdentityGuard'
+import { NotificationCenter, NotificationToast } from './components/Notifications'
 import { buildShoppingList, shoppingProgress } from './services/shoppingListEngine'
 
 function Shell() {
@@ -46,6 +49,10 @@ function Shell() {
           <div id="shell-sheets" ref={setSheets} />
           <BottomNav shopBadge={badge} />
           <Toast />
+          <NotificationToast />
+          <NotificationCenter />
+          <ConnectSheet />
+          <IdentityGuard />
         </div>
       </div>
       <Celebration />

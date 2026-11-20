@@ -20,6 +20,8 @@ interface Ui {
   toast: string | null
   showToast: (msg: string) => void
   celebration: CelebrationEvent | null
+  connectOpen: boolean
+  setConnectOpen: (o: boolean) => void
   celebrate: (x: number, y: number, label: string) => void
 }
 
@@ -46,6 +48,10 @@ export function UiProvider({ children }: { children: ReactNode }) {
   const [grouped, setGrouped] = usePersisted<boolean>('mealduo:grouped', false)
   const [toast, setToast] = useState<string | null>(null)
   const [celebration, setCelebration] = useState<CelebrationEvent | null>(null)
+  // dopo il ritorno dal login con il Worker (redirect) si riapre da solo il flusso di collegamento
+  const [connectOpen, setConnectOpen] = useState<boolean>(() => {
+    try { const r = sessionStorage.getItem('mealduo:resume-connect') === '1'; sessionStorage.removeItem('mealduo:resume-connect'); return r } catch { return false }
+  })
 
   const showToast = useCallback((msg: string) => setToast(msg), [])
   useEffect(() => {
@@ -64,7 +70,7 @@ export function UiProvider({ children }: { children: ReactNode }) {
     return () => window.clearTimeout(t)
   }, [celebration])
 
-  const value = useMemo<Ui>(() => ({ tab, setTab, memberId, setMemberId, day, setDay, filters, setFilters, grouped, setGrouped, toast, showToast, celebration, celebrate }),
-    [tab, memberId, setMemberId, day, filters, setFilters, grouped, setGrouped, toast, showToast, celebration, celebrate])
+  const value = useMemo<Ui>(() => ({ tab, setTab, memberId, setMemberId, day, setDay, filters, setFilters, grouped, setGrouped, toast, showToast, celebration, celebrate, connectOpen, setConnectOpen }),
+    [tab, memberId, setMemberId, day, filters, setFilters, grouped, setGrouped, toast, showToast, celebration, celebrate, connectOpen])
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>
 }

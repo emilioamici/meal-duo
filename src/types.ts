@@ -8,6 +8,8 @@ export const DAY_LONG = ['Lunedì', 'Martedì', 'Mercoledì', 'Giovedì', 'Vener
 export interface Versioned {
   updatedAt: string
   deleted?: boolean
+  /** id del membro che ha fatto l'ultima modifica (serve alle notifiche agli altri membri) */
+  by?: string
 }
 
 export interface Member extends Versioned {
@@ -64,7 +66,6 @@ export interface ShoppingCheck extends Versioned {
   /** chiave riga: `${foodId}|${unitBase}` oppure `extra:${id}` */
   key: string
   checked: boolean
-  by?: string
 }
 
 export interface ExtraItem extends Versioned {

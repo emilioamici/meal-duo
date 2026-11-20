@@ -1,8 +1,9 @@
 import { createPortal } from 'react-dom'
 import { AnimatePresence, motion } from 'framer-motion'
-import { CalendarDays, Cloud, CloudAlert, CloudOff, HousePlus, Loader2, Plus, RefreshCw, ShoppingBasket, Star, Users, UtensilsCrossed } from 'lucide-react'
+import { Bell, CalendarDays, Cloud, CloudAlert, CloudOff, HousePlus, Loader2, Plus, RefreshCw, ShoppingBasket, Star, Users, UtensilsCrossed } from 'lucide-react'
 import type { ComponentType } from 'react'
-import { useStore, type SyncStatus } from '../state/store'
+import { useStore } from '../state/store'
+import { engine, type SyncStatus } from '../sync/engine'
 import { useUi, type Tab } from '../state/ui'
 import { useOverlay } from '../state/overlay'
 
@@ -68,10 +69,10 @@ export function Fab({ onClick, label, icon }: { onClick: () => void; label: stri
   )
 }
 
-/* ---------- Pillola di stato sync (header) ---------- */
+/* ---------- Pillola di stato sync + campanella (header) ---------- */
 const SYNC_UI: Record<SyncStatus, { label: string; cls: string; icon: ComponentType<{ size?: number; className?: string }> }> = {
-  local: { label: 'Locale', cls: 'text-muted', icon: HousePlus },
-  idle: { label: 'Sync', cls: 'text-brand', icon: RefreshCw },
+  off: { label: 'Locale', cls: 'text-muted', icon: HousePlus },
+  pending: { label: 'Da inviare', cls: 'text-brand', icon: RefreshCw },
   syncing: { label: 'Sync…', cls: 'text-brand', icon: Loader2 },
   synced: { label: 'Sincronizzato', cls: 'text-inc', icon: Cloud },
   offline: { label: 'Offline', cls: 'text-muted', icon: CloudOff },
@@ -80,20 +81,36 @@ const SYNC_UI: Record<SyncStatus, { label: string; cls: string; icon: ComponentT
 }
 
 export function SyncPill() {
-  const { status, syncNow, fileId, dirty } = useStore()
-  const { setTab, showToast } = useUi()
-  const s = SYNC_UI[status]
+  const { sync } = useStore()
+  const { setConnectOpen, showToast } = useUi()
+  const s = SYNC_UI[sync.status]
   const Icon = s.icon
-  const onClick = async () => {
-    if (!fileId) { setTab('family'); showToast('Collega Google Drive per condividere la casa'); return }
-    await syncNow(true)
+  const onClick = () => {
+    if (!sync.fileId) return setConnectOpen(true)
+    if (sync.status === 'auth') return void engine.signIn().catch((e: Error) => showToast(e.message))
+    void engine.syncNow()
   }
   return (
-    <button onClick={onClick} className={`glass-btn !px-3 !py-1.5 text-xs ${s.cls}`} aria-label={`Sincronizzazione: ${s.label}. Tocca per sincronizzare`}>
-      <Icon size={15} className={status === 'syncing' ? 'animate-spin' : ''} />
-      <span>{status === 'idle' && dirty ? 'Da inviare' : s.label}</span>
+    <button onClick={onClick} className={`glass-btn !px-3 !py-1.5 text-xs ${s.cls}`} aria-label={`Sincronizzazione: ${s.label}. Tocca per ${sync.fileId ? 'sincronizzare' : 'collegare Google Drive'}`}>
+      <Icon size={15} className={sync.status === 'syncing' ? 'animate-spin' : ''} />
+      <span>{s.label}</span>
     </button>
   )
+}
+
+export function NotificationBell() {
+  const { unread, setCenterOpen } = useStore()
+  return (
+    <button className="glass-btn relative !h-9 !w-9 !p-0" aria-label={unread ? `Notifiche (${unread} non lette)` : 'Notifiche'} onClick={() => setCenterOpen(true)}>
+      <Bell size={17} />
+      {unread > 0 && <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-exp px-1 text-[10px] font-bold text-onbrand">{unread > 9 ? '9+' : unread}</span>}
+    </button>
+  )
+}
+
+/** Azioni a destra dell'header di ogni schermata. */
+export function HeaderActions() {
+  return <><NotificationBell /><SyncPill /></>
 }
 
 /* ---------- Toast ---------- */

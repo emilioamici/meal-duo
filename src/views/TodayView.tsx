@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { Pencil, Plus } from 'lucide-react'
 import { PageHeader, CleanBar, EmptyCard } from '../components/ui'
-import { Fab, SyncPill } from '../components/Chrome'
+import { Fab, HeaderActions } from '../components/Chrome'
 import { MascotImg, MascotPeek } from '../components/Mascots'
 import { MemberPills } from '../components/MemberPills'
 import { ItemSheet, MealSheet } from '../components/Sheets'
@@ -35,7 +35,7 @@ export function TodayView() {
 
   return (
     <>
-      <PageHeader title={day === today ? 'Oggi' : DAY_LONG[day]} subtitle={subtitle} right={<SyncPill />} />
+      <PageHeader title={day === today ? 'Oggi' : DAY_LONG[day]} subtitle={subtitle} right={<HeaderActions />} />
 
       <MemberPills members={members} value={member.id} onChange={setMemberId} />
 

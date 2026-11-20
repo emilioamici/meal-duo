@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { Check, Plus, RotateCcw, X } from 'lucide-react'
 import { PageHeader, CleanBar, Segmented, Sheet, ConfirmButton, EmptyCard, Avatar } from '../components/ui'
-import { Fab, SyncPill } from '../components/Chrome'
+import { Fab, HeaderActions } from '../components/Chrome'
 import { MascotImg, MascotPeek } from '../components/Mascots'
 import { useStore } from '../state/store'
 import { useUi } from '../state/ui'
@@ -46,7 +46,7 @@ export function ShoppingView() {
 
   return (
     <>
-      <PageHeader title="Spesa" subtitle={progress.total === 0 ? 'Nessun articolo' : remaining === 0 ? 'Tutto nel carrello!' : `${remaining} da comprare`} right={<SyncPill />} />
+      <PageHeader title="Spesa" subtitle={progress.total === 0 ? 'Nessun articolo' : remaining === 0 ? 'Tutto nel carrello!' : `${remaining} da comprare`} right={<HeaderActions />} />
 
       <MascotPeek kind="zenitsu" side="left">
         <div className="card p-4">
