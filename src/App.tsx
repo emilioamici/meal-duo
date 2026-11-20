@@ -23,8 +23,7 @@ function AppShell() {
   const { filters } = useUi()
   const scroller = useRef<HTMLDivElement>(null)
   const [overlay, setOverlay] = useState<HTMLElement | null>(null)
-  const [sheets, setSheets] = useState<HTMLElement | null>(null)
-  const hosts = useMemo(() => ({ overlay, sheets }), [overlay, sheets])
+  const hosts = useMemo(() => ({ overlay }), [overlay])
   useEffect(() => { scroller.current?.scrollTo({ top: 0 }) }, [tab])
 
   const badge = useMemo(() => {
@@ -50,7 +49,6 @@ function AppShell() {
             </AnimatePresence>
           </div>
           <div id="shell-overlay" ref={setOverlay} className="pointer-events-none absolute inset-0 z-30" />
-          <div id="shell-sheets" ref={setSheets} />
           <BottomNav shopBadge={badge} />
           <Toast />
           <NotificationToast />
@@ -77,7 +75,7 @@ function Root() {
   const locked = !!sync.fileId && sync.status === 'auth'
   return (
     <>
-      <div aria-hidden={locked || undefined} {...(locked ? { inert: true } : {})}><AppShell /></div>
+      <div className="h-full" aria-hidden={locked || undefined} {...(locked ? { inert: true } : {})}><AppShell /></div>
       {locked && <div className="fixed inset-0 z-[100] overflow-y-auto bg-bg" data-testid="login-overlay"><Gate reconnect /></div>}
     </>
   )

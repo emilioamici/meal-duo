@@ -134,7 +134,7 @@ export function addMember(db: AppDatabase, name: string, color: string, email?: 
   }
 }
 
-export function updateMember(db: AppDatabase, id: string, patch: Partial<Pick<Member, 'name' | 'color' | 'email'>>): AppDatabase {
+export function updateMember(db: AppDatabase, id: string, patch: Partial<Pick<Member, 'name' | 'color' | 'email' | 'joinedAt'>>): AppDatabase {
   const at = nowIso()
   return touch({ ...db, members: db.members.map((m) => (m.id === id ? { ...m, ...patch, updatedAt: at } : m)) }, at)
 }

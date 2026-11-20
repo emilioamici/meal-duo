@@ -16,6 +16,11 @@ export function IdentityGuard() {
   const ready = !!sync.fileId && sync.status === 'synced' && !!sync.email && sync.reconciled
   const unclaimed = members.filter((m) => !m.email)
 
+  // primo accesso: il membro smette di risultare «Invitato»
+  useEffect(() => {
+    if (ready && me && !me.joinedAt) commit((d) => updateMember(d, me.id, { joinedAt: new Date().toISOString() }))
+  }, [ready, me?.id, me?.joinedAt]) // eslint-disable-line react-hooks/exhaustive-deps
+
   // due membri con la stessa email (invito arrivato dopo il primo accesso): si unificano, tenendo quello col piano
   useEffect(() => {
     if (!ready || !me) return

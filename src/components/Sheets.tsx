@@ -54,7 +54,8 @@ export function ItemSheet({ open, onClose, memberId, day, mealId, item }: {
   }
 
   return (
-    <Sheet open={open} onClose={onClose} title={item ? t('Modifica alimento') : t('Aggiungi alimento')}>
+    <Sheet open={open} onClose={onClose} title={item ? t('Modifica alimento') : t('Aggiungi alimento')}
+      footer={<button className="glass-btn btn-primary w-full !py-3.5" disabled={!valid} onClick={save}>{item ? t('Salva') : t('Aggiungi')}</button>}>
       <label className="label !mt-2">{t('Alimento')}</label>
       <FoodInput value={name} catalog={liveFoods(db)} autoFocus={!item}
         onChange={(t) => { setName(t); setFoodId(undefined) }}
@@ -73,7 +74,7 @@ export function ItemSheet({ open, onClose, memberId, day, mealId, item }: {
       </div>
       <div className="-mx-1 mt-2 flex gap-2 overflow-x-auto px-1 pb-1">
         {['g', 'ml', 'pz'].map((u) => (
-          <button key={u} type="button" className={`chip ${cleanUnit(unit) === u ? 'chip-active' : ''}`} onClick={() => setUnit(u)}>{u}</button>
+          <button key={u} type="button" className={`chip !py-1 !text-xs ${cleanUnit(unit) === u ? 'chip-active' : ''}`} onClick={() => setUnit(u)}>{u}</button>
         ))}
       </div>
 
@@ -84,8 +85,6 @@ export function ItemSheet({ open, onClose, memberId, day, mealId, item }: {
         ))}
         {meals.length === 0 && <p className="text-sm text-muted">{t('Nessun pasto: aggiungine uno dalla schermata Oggi.')}</p>}
       </div>
-
-      <button className="glass-btn btn-primary mt-5 w-full !py-3.5" disabled={!valid} onClick={save}>{item ? 'Salva' : 'Aggiungi'}</button>
       {item && (
         <ConfirmButton className="mt-2 w-full" label={<><Trash2 size={16} />{t('Elimina alimento')}</>}
           onConfirm={() => { commit((d) => removeItem(d, memberId, day, item.id)); onClose() }} />
@@ -107,7 +106,8 @@ export function MealSheet({ open, onClose, memberId, day, meal }: {
     onClose()
   }
   return (
-    <Sheet open={open} onClose={onClose} title={meal ? t('Modifica pasto') : t('Nuovo pasto')}>
+    <Sheet open={open} onClose={onClose} title={meal ? t('Modifica pasto') : t('Nuovo pasto')}
+      footer={<button className="glass-btn btn-primary w-full !py-3.5" disabled={!name.trim()} onClick={save}>{meal ? t('Salva') : t('Aggiungi pasto')}</button>}>
       <label className="label !mt-2">{t('Nome')}</label>
       <input className="field" value={name} autoFocus placeholder={t('es. Spuntino serale')} onChange={(e) => setName(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && save()} />
       {!meal && (
@@ -115,7 +115,6 @@ export function MealSheet({ open, onClose, memberId, day, meal }: {
           {['Spuntino serale', 'Pre-workout', 'Post-workout'].map((s) => <button key={s} type="button" className="chip" onClick={() => setName(t(s))}>{t(s)}</button>)}
         </div>
       )}
-      <button className="glass-btn btn-primary mt-5 w-full !py-3.5" disabled={!name.trim()} onClick={save}>{meal ? t('Salva') : t('Aggiungi pasto')}</button>
       {meal && (
         <ConfirmButton className="mt-2 w-full" label={<><Trash2 size={16} />{t('Elimina pasto')}</>}
           onConfirm={() => { commit((d) => removeMeal(d, memberId, day, meal.id)); onClose() }} />
@@ -132,7 +131,11 @@ export function CopyDaySheet({ open, onClose, memberId, from }: { open: boolean;
   useEffect(() => { if (open) setTargets([]) }, [open, from])
   const toggle = (d: DayIndex) => setTargets((t) => (t.includes(d) ? t.filter((x) => x !== d) : [...t, d]))
   return (
-    <Sheet open={open} onClose={onClose} title={t('Copia {day}', { day: dayLong(from) })}>
+    <Sheet open={open} onClose={onClose} title={t('Copia {day}', { day: dayLong(from) })}
+      footer={<button className="glass-btn btn-primary w-full !py-3.5" disabled={targets.length === 0}
+        onClick={() => { commit((d) => copyDay(d, memberId, from, targets)); showToast(tp(targets.length, 'Copiato su {n} giorno', 'Copiato su {n} giorni', { n: targets.length })); onClose() }}>
+        {targets.length ? tp(targets.length, 'Copia su {n} giorno', 'Copia su {n} giorni', { n: targets.length }) : t('Copia su …')}
+      </button>}>
       <p className="text-sm text-muted">{tb('Scegli i giorni su cui copiare pasti e alimenti. I giorni scelti verranno <b>sostituiti</b>.')}</p>
       <div className="mt-4 grid grid-cols-4 gap-2">
         {DAY_INDEXES.filter((d) => d !== from).map((d) => (
@@ -140,10 +143,6 @@ export function CopyDaySheet({ open, onClose, memberId, from }: { open: boolean;
         ))}
       </div>
       <button type="button" className="mt-3 text-sm font-semibold text-brand" onClick={() => setTargets(DAY_INDEXES.filter((d) => d !== from))}>{t('Seleziona tutti')}</button>
-      <button className="glass-btn btn-primary mt-4 w-full !py-3.5" disabled={targets.length === 0}
-        onClick={() => { commit((d) => copyDay(d, memberId, from, targets)); showToast(tp(targets.length, 'Copiato su {n} giorno', 'Copiato su {n} giorni', { n: targets.length })); onClose() }}>
-        {targets.length ? tp(targets.length, 'Copia su {n} giorno', 'Copia su {n} giorni', { n: targets.length }) : t('Copia su …')}
-      </button>
     </Sheet>
   )
 }

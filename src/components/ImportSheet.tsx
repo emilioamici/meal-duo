@@ -32,7 +32,8 @@ export function ImportSheet({ open, onClose, initialMemberId }: { open: boolean;
   }
 
   return (
-    <Sheet open={open} onClose={close} title={t('Importa piano JSON')}>
+    <Sheet open={open} onClose={close} title={t('Importa piano JSON')}
+      footer={<button className="glass-btn btn-primary w-full !py-3.5" disabled={!parsed?.ok} onClick={doImport}>{t('Importa piano di {name}', { name: target?.name ?? '' })}</button>}>
       <label className="label !mt-2">{t('Importa per')}</label>
       <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
         {members.map((m) => (
@@ -77,7 +78,6 @@ export function ImportSheet({ open, onClose, initialMemberId }: { open: boolean;
           <p className="text-xs text-muted">{tb('Il piano attuale di {name} verrà <b>sostituito</b>.', { name: target?.name ?? '' })}</p>
         </div>
       )}
-      <button className="glass-btn btn-primary mt-4 w-full !py-3.5" disabled={!parsed?.ok} onClick={doImport}>{t('Importa piano di {name}', { name: target?.name ?? '' })}</button>
     </Sheet>
   )
 }

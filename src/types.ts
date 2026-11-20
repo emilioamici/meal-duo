@@ -18,6 +18,8 @@ export interface Member extends Versioned {
   /** colore HEX scelto dall'utente (vedi DESIGN_SYSTEM.md §1.6) */
   color: string
   email?: string
+  /** primo accesso con l'account Google associato (finché manca, il membro risulta «Invitato») */
+  joinedAt?: string
 }
 
 export type FoodCategory =
