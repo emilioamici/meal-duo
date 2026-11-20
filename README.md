@@ -84,7 +84,7 @@ src/
 └─ views/                        TodayView, WeekView, ShoppingView, FamilyView
 worker/                          Cloudflare Worker: broker OAuth (accesso persistente) + push (vedi worker/README.md)
 public/push-sw.js                gestori push/notificationclick caricati dal service worker di Workbox
-public/icons/ · public/cats/     icone PWA (da assets/icon-source.png) e mascotte (segnaposto SVG)
+public/icons/ · public/cats/     icone PWA (da assets/icon-source.png) e mascotte (PNG condivisi con le altre app)
 scripts/generate_icons.py        genera le icone PWA
 .github/workflows/deploy.yml     test + build + deploy su GitHub Pages
 ```
@@ -288,7 +288,7 @@ I testi sono in italiano nel codice: `t('Testo italiano {nome}', { nome })` rest
 
 Dove `DESIGN_SYSTEM.md` non copriva un caso, si è scelta la soluzione più vicina allo stile esistente, senza nuovi colori o ombre.
 
-- **Mascotte segnaposto.** Il documento descrive PNG di MoneyDuo (con fessura da salvadanaio, inadatti). Finché non arrivano le immagini definitive, `public/cats/{mochi,zenitsu,pair}.svg` sono SVG neutri nello stesso stile (occhi chiusi sorridenti, collarino con campanellino). Per sostituirle: copiare i PNG con lo stesso nome e cambiare le estensioni in `src/components/Mascots.tsx` (`FILE`).
+- **Mascotte uguali alle altre app.** `public/cats/{mochi,zenitsu,pair}.png` sono gli stessi file di Clean Duo e MoneyDuo (identici byte per byte). Hanno la fessura da salvadanaio sulla testa, nata per MoneyDuo; resta, come in Clean Duo, finché non ci sono varianti dedicate a Meal Duo (§4.5 del Design System).
 - **Portal per fogli e FAB** tramite un contesto (`state/overlay.tsx`): le pagine animate usano `filter: blur()` e creano un containing block (§2.2); i fogli `fixed` montati dentro la pagina non si ancoravano al fondo dello schermo (bug trovato e corretto durante la verifica).
 - **Colori membro**: tavolozza di 8 colori caldi/neutri presi dalle palette membro e stanza del documento; usati solo come dato scelto dall'utente (§0.2). I badge per-membro sulla spesa usano testo `ink` su `bg-bg` con un puntino colorato (mai testo colorato su fondo colorato).
 - **Celebrazione** a stelle (§3.3) al completamento della spesa, con haptic dove disponibile.
@@ -324,6 +324,6 @@ Verificata con Playwright (iPhone 14, tema chiaro e scuro) e ispezione del codic
 - Con `drive.file` il secondo membro deve usare il Picker (§4).
 - L'accesso persistente richiede il Worker e un account Cloudflare protetto: custodisce un token di rinnovo con accesso a Drive (vedi `worker/README.md`).
 - Il push ad app chiusa non è stato provato su dispositivi reali (iOS/Android): è coperto da test su cifratura, VAPID e service worker.
-- Le mascotte dentro l'app (capolino) sono ancora segnaposto SVG; l'icona PWA è definitiva.
+- Le mascotte sono quelle condivise con Clean Duo e MoneyDuo (con la fessura da salvadanaio); l'icona PWA è definitiva.
 - I token GIS durano ~1 ora: se scade e il rinnovo silenzioso è bloccato dal browser, la pillola mostra «Accedi» e basta un tocco.
 - `headRevisionId`/`version` rilevano le modifiche altrui ma non c'è locking: vedi la nota sulla finestra di race in §5.
