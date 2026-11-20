@@ -9,7 +9,9 @@
 - Funziona **offline** (cache locale + service worker) e si sincronizza da sola.
 - Stile **Liquid Glass** come da `DESIGN_SYSTEM.md` (temi Mochi chiaro / Zenitsu scuro).
 
-> **Modalità demo:** al primo avvio l'app contiene i dati di esempio di due persone (Emilio e Sara) e funziona subito, senza login Google.
+> **Primo avvio:** come in MoneyDuo si parte dal **Gate** (accesso con Google → la casa viene trovata o creata). Chi vuole solo provare l'app può toccare **«Prova senza account»**: contiene i dati di esempio di due persone (Emilio e Sara) e funziona subito, senza login Google.
+>
+> **Lingue:** italiano e inglese (automatico dal dispositivo, cambiabile da Famiglia → Aspetto).
 
 ---
 
@@ -18,8 +20,8 @@
 1. [Avvio in locale](#1-avvio-in-locale)
 2. [Struttura del progetto](#2-struttura-del-progetto)
 3. [Setup Google Cloud Console](#3-setup-google-cloud-console-client-id--drive-api)
-4. [Condividere il database con i familiari](#4-condividere-il-database-con-i-familiari)
-5. [Sincronizzazione, offline e conflitti](#5-sincronizzazione-offline-e-conflitti)
+4. [Accesso, condivisione e inviti](#4-accesso-condivisione-e-inviti)
+5. [Sincronizzazione, offline e conflitti](#5-sincronizzazione-offline-e-conflitti) · [Worker e notifiche push](#5b-worker-e-notifiche-push-facoltativo)
 6. [Import / export del piano in JSON](#6-import--export-del-piano-in-json)
 7. [Deploy su GitHub Pages](#7-deploy-su-github-pages)
 8. [Icona dell'app](#8-icona-dellapp)
@@ -61,22 +63,30 @@ src/
 ├─ types.ts                      Member, FoodCatalogItem, MealItem, Meal, DayPlan, WeeklyPlan,
 │                                ShoppingCheckState, AppDatabase …
 ├─ data/demo.ts                  dati di esempio (Emilio e Sara)
+├─ sync/                         tutto ciò che parla con Google e col Worker
+│  ├─ google.ts                  Google Identity Services: token a popup (1 h) e scope
+│  ├─ auth.ts                    accesso persistente: sessione sul Worker, rinnovo token senza popup
+│  ├─ drive.ts                   Drive REST v3: ricerca/lettura/scrittura del file, inviti e revoche
+│  ├─ picker.ts                  Google Picker (scelta del file/cartella con scope drive.file)
+│  ├─ engine.ts                  motore di sync: versione remota, merge, ricontrollo, riconnessione
+│  ├─ push.ts · pushQueue.ts     iscrizione push e coda delle notifiche da inviare
 ├─ services/
-│  ├─ googleDriveService.ts      GIS (OAuth token client) + Drive v3 + Picker
-│  ├─ syncEngine.ts              sync con controllo di revisione e merge
 │  ├─ merge.ts                   merge last-write-wins per record (con tombstone)
 │  ├─ shoppingListEngine.ts      aggregazione e filtri della spesa (funzioni pure)
-│  ├─ dbOps.ts                   tutte le mutazioni (immutabili) del database
-│  ├─ dbSchema.ts                validazione del DB letto da Drive / localStorage
+│  ├─ dbOps.ts · dbSchema.ts     mutazioni immutabili e validazione del DB
 │  └─ planIO.ts                  import/export JSON del piano
-├─ lib/                          foodMatch (fuzzy), units, theme, files, ids
-├─ state/                        store (DB + cache + sync), ui, overlay
-├─ components/                   ui (Sheet, Segmented…), Chrome (nav, FAB, toast…), Mascots, Sheets…
+├─ lib/                          foodMatch (fuzzy), units, notifications (chi avvisare e cosa), theme, actor…
+├─ i18n/                         t()/tb()/tp(), dizionario inglese (en.ts) e test di copertura
+├─ state/                        store (DB + cache IndexedDB + notifiche), cache, ui, overlay
+├─ components/                   ui, Chrome, Mascots, Sheets, Gate, ConnectSheet (flusso di collegamento), FolderPicker,
+│                                IdentityGuard, SyncCard,
+│                                NotificationsCard, Notifications …
 └─ views/                        TodayView, WeekView, ShoppingView, FamilyView
-public/icons/                    icone PWA (segnaposto → vedi §8)
-public/cats/                     mascotte (segnaposto SVG → vedi §10)
-scripts/generate_icons.py        genera le icone PWA da assets/icon-source.png
-.github/workflows/deploy.yml     build + deploy su GitHub Pages
+worker/                          Cloudflare Worker: broker OAuth (accesso persistente) + push (vedi worker/README.md)
+public/push-sw.js                gestori push/notificationclick caricati dal service worker di Workbox
+public/icons/ · public/cats/     icone PWA (da assets/icon-source.png) e mascotte (segnaposto SVG)
+scripts/generate_icons.py        genera le icone PWA
+.github/workflows/deploy.yml     test + build + deploy su GitHub Pages
 ```
 
 ---
@@ -109,42 +119,71 @@ L'app non ha un backend: ogni utente accede con il proprio account Google e l'ap
 
 ---
 
-## 4. Condividere il database con i familiari
+## 4. Accesso, condivisione e inviti
 
-Il database è **un file** `meal-duo-db.json` che appartiene a chi lo crea.
+**Gate.** Senza una casa collegata l'app mostra a schermo intero la schermata di accesso (come MoneyDuo): **Accedi con Google** → l'app cerca il database e lo collega, oppure propone di crearlo. «Prova senza account (dati demo)» è l'unica uscita: l'app resta in locale e la casa si può collegare in seguito da **Famiglia → Google Drive & Sync** (o dalla pillola «Locale»).
 
-### Chi crea la casa (utente principale)
-1. **Famiglia → Google Drive & Sync → Accedi con Google**.
-2. **Crea casa su Drive** (scegli se partire da zero o caricare i dati demo).
-3. Nella stessa scheda, sotto «Invita un familiare», inserisci la sua **email Google** e premi invio: l'app assegna il ruolo **Editor** sul file via Drive API (Drive manda l'email di invito).
-   In alternativa copia l'**ID del database** e condividilo.
+**Sessione scaduta.** Con una casa collegata, se la sessione Google non è più valida (e sei online) il Gate di riconnessione **copre tutta l'app** e i dati restano nascosti finché non accedi; l'app resta montata sotto, inerte, così quello che stavi scrivendo non si perde. Offline si resta sui dati locali.
 
-### Chi si unisce (secondo membro)
-1. Apre l'app, inserisce lo **stesso Client ID** e preme **Accedi con Google**.
-2. Preme **Scegli da Drive** e seleziona `meal-duo-db.json` → l'app concede a sé stessa l'accesso a quel file e si collega.
-3. Da quel momento entrambi leggono e scrivono sullo stesso JSON.
+**Cartella del database.** Alla creazione della casa e poi da *Google Drive & Sync → Cartella del database → Sposta* (solo il proprietario) si sceglie dove sta il file: con il Picker attivo si usa il selettore di Google, altrimenti l'esplora-cartelle interno (cartelle del tuo Drive, «Nuova cartella qui»).
+
+### Chi crea la casa (proprietario)
+1. **Accedi con Google** → l'app cerca un database `meal-duo-db.json` che l'account può vedere.
+2. Se non c'è: **Crea casa** (nome della casa, il tuo nome, cartella di Drive se il Picker è attivo). Il file ha il marcatore pubblico `properties.mealduo=db` e `writersCanShare=false`: **solo il proprietario può invitare o rimuovere persone**.
+3. **Famiglia → Membri → Invita con Google Drive**: inserisci l'email del familiare (e se è una persona già presente nel piano, collegala a quel membro). L'app concede il ruolo **Editor** sul file via Drive API e Drive manda l'email di invito.
+
+### Chi si unisce
+1. Apre l'app → **Collega Google Drive** → accede con *il proprio* account Google.
+2. Se l'app trova il file lo collega da sola. Altrimenti, nella schermata «Nessuna casa trovata», **Scegli il database della casa** (Picker): il file è in «Condivisi con me». Lo si fa una volta sola.
+3. Se sul dispositivo ci sono dati propri l'app chiede se **unirli** al file o **usare solo il file**.
+4. **Chi sei?** — l'account viene associato al membro (l'invito ha già salvato la sua email; se il file è stato condiviso a mano si sceglie il membro o ci si aggiunge).
+
+Per **rimuovere** una persona: Membri → Modifica → *Rimuovi membro*: il proprietario revoca anche l'accesso al file su Drive.
 
 ### ⚠️ Perché serve il Picker (e non basta l'ID)
-Con lo scope `drive.file`, Drive nega l'accesso (`404`) a file creati da altri **anche se condivisi con te**, finché l'utente non li ha «aperti» con quell'app. Il **Google Picker** è il modo ufficiale per farlo con un solo gesto. Il campo «Collega ID» funziona quando il file è già stato aperto/creato con quell'account (es. secondo dispositivo dello stesso utente); in caso contrario l'app mostra un messaggio che indirizza al Picker. Per il Picker servono API Key e App ID (passo 5 sopra).
+Con lo scope `drive.file`, Drive nega l'accesso (`404`) ai file creati da altri **anche se condivisi con te**, finché l'utente non li ha «aperti» con quell'app: il **Picker** è il modo ufficiale. Con API Key e App ID configurati (§3, passo 5) l'app chiede *solo* `drive.file`; senza, usa lo scope completo `drive` (vede i file condivisi, ma chiede un permesso molto più ampio). «Ho il link o l'ID» funziona solo con lo scope completo o se il file è già stato aperto con quell'account.
 
 ---
 
 ## 5. Sincronizzazione, offline e conflitti
 
-**Cache locale.** Ogni modifica viene salvata subito in `localStorage`; l'app è sempre utilizzabile offline.
+**Cache locale.** Il database vive in memoria con una copia in **IndexedDB** (con la versione di Drive a cui corrisponde): l'app parte subito ed è sempre utilizzabile offline.
 
-**Quando si sincronizza:** all'apertura, ~1 s dopo ogni modifica, quando l'app torna visibile o online, ogni 30 s e dal pulsante **Sync** (pillola in alto a destra di ogni schermata).
+**Se la copia locale manca o è datata** (cache cancellata dal browser, altra versione) il motore **rilegge Drive prima di inviare qualsiasi cosa**: una copia vuota non può mai sovrascrivere il file.
 
-**Controllo di versione.** Ogni sync legge la revisione del file su Drive (`headRevisionId`, o `version` se assente):
+**Quando si sincronizza:** all'apertura, ~2 s dopo ogni modifica, quando l'app torna visibile o online, ogni 2 minuti (anche in background) e dalla pillola in alto a destra.
 
-1. se è cambiata dall'ultima sync → scarica il remoto e lo **fonde** con lo stato locale;
-2. se il risultato differisce dal remoto → **ricontrolla la revisione** subito prima di scrivere (se nel frattempo è cambiata, ripete da 1) e poi carica.
+**Controllo di versione.** Ogni ciclo legge la `version` del file su Drive:
+1. se è cambiata → scarica il remoto e lo **fonde** con lo stato locale (record per record);
+2. se il risultato differisce dal remoto → **ricontrolla la versione** subito prima di scrivere (se nel frattempo è cambiata, ripete da 1, max 3 volte) e poi carica.
 
-**Merge senza perdite.** Il merge lavora per **record** con regola *last-write-wins* su `updatedAt` e *tombstone* per le cancellazioni: giorni di piano (per membro), alimenti del catalogo, membri, spunte, voci extra. Se Emilio spunta il riso mentre Sara aggiunge «Carta forno», **entrambe** le modifiche sopravvivono. Il merge è commutativo e idempotente (coperto da test), quindi i dispositivi convergono sempre allo stesso stato.
+**Merge senza perdite.** *Last-write-wins* su `updatedAt` per **record** con *tombstone* per le cancellazioni (giorni di piano per membro, alimenti, membri, spunte, voci extra): se Emilio spunta il riso mentre Sara aggiunge «Carta forno», **entrambe** le modifiche sopravvivono. Il merge è commutativo e idempotente (coperto da test).
 
-> Limite onesto: Drive non offre un «if-match» sulla scrittura, quindi resta una finestra di millisecondi tra l'ultimo controllo e l'upload. Anche lì non si perde nulla in modo permanente: l'altro dispositivo conserva le proprie modifiche in locale e, alla sync successiva (revisione cambiata), le ri-fonde e le ricarica.
+> Limite onesto: Drive non offre un «if-match» sulla scrittura, quindi resta una finestra di millisecondi tra l'ultimo controllo e l'upload. Anche lì non si perde nulla in modo permanente: l'altro dispositivo conserva le proprie modifiche in locale e, alla sync successiva (versione cambiata), le ri-fonde e le ricarica.
 
-Stati della pillola: *Locale* (non collegato) · *Sync…* · *Sincronizzato* · *Da inviare* · *Offline* · *Accedi* (token scaduto: tocca per rientrare) · *Errore*.
+**Sessione Google.** Due modalità:
+- **A popup (senza Worker):** il token dura 1 ora; l'app lo rinnova in silenzio a ogni tocco nell'ultima ora. Se non è possibile compare «Accedi» (un tocco).
+- **Persistente (con il Worker):** il Worker conserva il token di rinnovo (cifrato) e l'app ottiene token freschi da sola, anche in background: niente popup e le notifiche non si fermano. Dettagli e rischi in `worker/README.md`.
+
+Stati della pillola: *Locale* · *Da inviare* · *Sync…* · *Sincronizzato* · *Offline* · *Accedi* · *Errore*.
+
+---
+
+## 5b. Worker e notifiche push (facoltativo)
+
+`worker/` contiene un piccolo **Cloudflare Worker** (piano gratuito) che fa due cose: **accesso persistente** (broker OAuth) e **notifiche push anche con l'app chiusa**. Il Worker non ha mai accesso a Drive con i dati della casa: a ogni richiesta verifica il token Google di chi scrive e che abbia accesso al file; salva solo gli iscritti push (chiave `id database + email`).
+
+Installazione passo passo: **`worker/README.md`**. In breve: `node worker/scripts/generate-vapid.mjs` → `wrangler.toml` → `wrangler kv namespace create SUBS` → `wrangler secret put …` → `wrangler deploy` → variabili GitHub `VITE_PUSH_URL` e `VITE_VAPID_PUBLIC_KEY` → rilancia il deploy.
+
+**Cosa viene notificato** (agli altri membri con un account Google associato, mai a chi fa la modifica):
+
+| Evento | Esempio |
+|---|---|
+| Voce extra aggiunta alla spesa | «Bruno ha aggiunto «Detersivo» alla spesa» |
+| Articoli spuntati (chi fa la spesa si vede) | «Sara ha preso Latte» · oltre 3: «Sara ha spuntato 5 articoli» |
+| Modifica del **tuo** piano da parte di un altro | «Emilio ha modificato il tuo piano · Martedì» |
+
+Ogni notifica compare nella **campanella** dell'app (anche senza Worker, ricevuta alla sync), come avviso del telefono se l'app è in background e, con il Worker, come push ad app chiusa. Le notifiche push partono **dopo** che i dati sono arrivati su Drive (coda locale che sopravvive a offline e riavvii, scarto dopo 24 h o se la voce è stata eliminata); le spunte dello stesso autore **sostituiscono** la precedente (stesso `tag`). Si attivano da **Famiglia → Notifiche**. Su iPhone servono iOS 16.4+ e l'app aggiunta alla Home.
 
 ---
 
@@ -221,15 +260,27 @@ L'icona definitiva (i due gattini con le borse della spesa) è in `assets/icon-s
 
 ## 9. Test
 
-`npm test` esegue 54 test (Vitest) che coprono:
+`npm test` esegue 150 test (Vitest) che coprono:
 
 - **Motore della spesa:** somme tra membri/giorni, conversione kg→g e l→ml, unità incompatibili su righe separate, errori di virgola mobile, esclusione di membri e giorni (singoli e combinati), tombstone, immutabilità dell'input, spunte stabili al cambio filtri, «Nuova spesa», progresso.
 - **Fuzzy matching** (`pollo` → `Petto di pollo`, plurali, typo, alias, ambiguità) e unione dei duplicati con ridirezione delle voci dei piani.
 - **Merge** (commutatività, idempotenza, modifiche concorrenti su record diversi, tombstone).
 - **Import/export** (validazione con percorsi, round-trip export → import identico sulla spesa).
-- **Sync** con Drive simulato: nessuna operazione se invariato, push, merge bidirezionale, **race condition** (scrittura altrui tra lettura e scrittura), permessi di sola lettura.
+- **Motore di sync** con Drive simulato: nessuna operazione se invariato, push, merge bidirezionale, **race condition** (scrittura altrui tra lettura e scrittura), sola lettura, offline, **copia locale persa/datata che non sovrascrive Drive**, creazione/collegamento della casa.
+- **Notifiche** (chi avvisare e cosa, raggruppamenti, mai per le proprie modifiche) e **coda push** (ordine, scarti, retry).
+- **i18n**: ogni testo usato nel codice ha la traduzione inglese, segnaposto e tag coerenti, nessun testo JSX lasciato fuori da `t()`; **Drive** (cartelle, spostamento, inviti, revoche, ricerca per marcatore); **membri duplicati** per email.
+- **Worker**: cifratura RFC 8291, VAPID, endpoint subscribe/notify/auth (sessioni cifrate, rinnovo, revoca), service worker push.
 
-> L'integrazione reale con Google (OAuth, Drive, Picker) richiede un Client ID e **non** è coperta da test automatici: è verificata contro un Drive simulato; la prova end-to-end va fatta con il proprio progetto Cloud (§3).
+> L'integrazione reale con Google (OAuth, Drive, Picker) richiede un Client ID e **non** è coperta da test automatici: è verificata contro un Drive e un Worker simulati (anche con due browser, inviti e notifiche inclusi); la prova con il proprio progetto Cloud va fatta a mano (§3).
+
+---
+
+## 9b. Lingue (it / en)
+
+I testi sono in italiano nel codice: `t('Testo italiano {nome}', { nome })` restituisce il testo nella lingua in uso; in inglese lo cerca in `src/i18n/en.ts` (la chiave è il testo italiano) e, se manca, ripiega sull'italiano. `tb()` accetta `<b>` e `<code>`, `tp(n, singolare, plurale)` gestisce i plurali, `dayShort/dayLong` i giorni, `locale()` date e numeri. Lingua: *Automatico* (segue il browser: italiano se `it`, altrimenti inglese), *Italiano*, *English* — da **Famiglia → Aspetto**; si applica subito, senza ricaricare.
+
+**Aggiungere un testo:** scrivilo con `t('…')` e aggiungi la voce in `en.ts`; `npm test` fallisce se manca la traduzione, se i segnaposto non coincidono o se resta testo JSX fuori da `t()`.
+**Non si traducono i dati dell'utente:** nomi di alimenti e pasti, nomi dei membri e della casa, e il formato JSON del piano (giorni in italiano; l'import accetta anche i nomi inglesi). Le notifiche push sono scritte nella lingua di chi fa la modifica.
 
 ---
 
@@ -271,6 +322,8 @@ Verificata con Playwright (iPhone 14, tema chiaro e scuro) e ispezione del codic
 
 - Integrazione Google non verificabile senza credenziali: provata solo con Drive simulato (§9).
 - Con `drive.file` il secondo membro deve usare il Picker (§4).
+- L'accesso persistente richiede il Worker e un account Cloudflare protetto: custodisce un token di rinnovo con accesso a Drive (vedi `worker/README.md`).
+- Il push ad app chiusa non è stato provato su dispositivi reali (iOS/Android): è coperto da test su cifratura, VAPID e service worker.
 - Le mascotte dentro l'app (capolino) sono ancora segnaposto SVG; l'icona PWA è definitiva.
 - I token GIS durano ~1 ora: se scade e il rinnovo silenzioso è bloccato dal browser, la pillola mostra «Accedi» e basta un tocco.
 - `headRevisionId`/`version` rilevano le modifiche altrui ma non c'è locking: vedi la nota sulla finestra di race in §5.

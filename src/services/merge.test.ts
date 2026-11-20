@@ -81,3 +81,22 @@ describe('mergeDatabases (LWW per record)', () => {
     expect(meals[2].items).toEqual([{ id: 'i1', foodId: 'riso', quantity: 20, unit: 'g' }])
   })
 })
+
+describe('dedupeMembersByEmail', () => {
+  it('stessa email su due membri: tiene quello col piano, tombstone sull\'altro', async () => {
+    const { dedupeMembersByEmail } = await import('./dbOps')
+    let db = fixtureDb()
+    db = { ...db, members: db.members.map((m) => (m.id === 'a' ? { ...m, email: 'x@y.it' } : m.id === 'b' ? { ...m, email: 'X@y.it' } : m)) }
+    db = put(db, 'b', 0, 'riso', 80, 'g')
+    const out = dedupeMembersByEmail(db)
+    expect(out.members.filter((m) => !m.deleted).map((m) => m.id)).toEqual(['b'])
+    expect(out.plans.a.deleted).toBe(true)
+    expect(buildShoppingList(out)[0].total).toBe(80)
+    expect(dedupeMembersByEmail(out)).toBe(out) // idempotente
+  })
+  it('email diverse o assenti: nessuna modifica', async () => {
+    const { dedupeMembersByEmail } = await import('./dbOps')
+    const db = fixtureDb()
+    expect(dedupeMembersByEmail(db)).toBe(db)
+  })
+})

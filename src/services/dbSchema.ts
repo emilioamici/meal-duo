@@ -7,6 +7,7 @@ import { uid } from '../lib/ids'
 
 const isObj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v)
 const str = (v: unknown, d = ''): string => (typeof v === 'string' ? v : d)
+const by = (v: unknown): string | undefined => (typeof v === 'string' && v ? v : undefined)
 const iso = (v: unknown): string => (typeof v === 'string' && !Number.isNaN(Date.parse(v)) ? v : EPOCH)
 
 export function parseDb(raw: unknown): AppDatabase {
@@ -17,6 +18,7 @@ export function parseDb(raw: unknown): AppDatabase {
     name: str(m.name, 'Membro'),
     color: str(m.color, '#c9692a'),
     email: typeof m.email === 'string' && m.email ? m.email : undefined,
+    by: by(m.by),
     updatedAt: iso(m.updatedAt),
     deleted: m.deleted === true ? true : undefined,
   }))
@@ -27,6 +29,7 @@ export function parseDb(raw: unknown): AppDatabase {
     unit: str(f.unit, 'g'),
     category: (FOOD_CATEGORIES.includes(f.category as FoodCategory) ? f.category : 'Surgelati e altro') as FoodCategory,
     aliases: Array.isArray(f.aliases) ? f.aliases.filter((a): a is string => typeof a === 'string') : undefined,
+    by: by(f.by),
     updatedAt: iso(f.updatedAt),
     deleted: f.deleted === true ? true : undefined,
   }))
@@ -49,9 +52,9 @@ export function parseDb(raw: unknown): AppDatabase {
             unit: str(it.unit, 'g'),
           })),
         }))
-        return { meals, updatedAt: iso(d.updatedAt), deleted: d.deleted === true ? true : undefined }
+        return { meals, updatedAt: iso(d.updatedAt), by: by(d.by), deleted: d.deleted === true ? true : undefined }
       })
-      plans[memberId] = { memberId, days, updatedAt: iso(p.updatedAt), deleted: p.deleted === true ? true : undefined }
+      plans[memberId] = { memberId, days, updatedAt: iso(p.updatedAt), by: by(p.by), deleted: p.deleted === true ? true : undefined }
     }
   }
 
@@ -59,7 +62,7 @@ export function parseDb(raw: unknown): AppDatabase {
   const checks: AppDatabase['shopping']['checks'] = {}
   if (isObj(sh.checks)) {
     for (const [k, c] of Object.entries(sh.checks)) {
-      if (isObj(c)) checks[k] = { key: k, checked: c.checked === true, by: typeof c.by === 'string' ? c.by : undefined, updatedAt: iso(c.updatedAt), deleted: c.deleted === true ? true : undefined }
+      if (isObj(c)) checks[k] = { key: k, checked: c.checked === true, by: by(c.by), updatedAt: iso(c.updatedAt), deleted: c.deleted === true ? true : undefined }
     }
   }
   const extras = (Array.isArray(sh.extras) ? sh.extras : []).filter(isObj).map((e) => ({
@@ -67,6 +70,7 @@ export function parseDb(raw: unknown): AppDatabase {
     name: str(e.name, 'Voce'),
     quantity: typeof e.quantity === 'string' && e.quantity ? e.quantity : undefined,
     checked: e.checked === true,
+    by: by(e.by),
     updatedAt: iso(e.updatedAt),
     deleted: e.deleted === true ? true : undefined,
   }))

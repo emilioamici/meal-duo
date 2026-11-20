@@ -4,6 +4,7 @@ import { useOverlay } from '../state/overlay'
 import { AnimatePresence, motion, useDragControls } from 'framer-motion'
 import { ChevronDown, X } from 'lucide-react'
 import type { Member } from '../types'
+import { t } from '../i18n'
 
 /* ---------- Avatar (colore scelto dall'utente: eccezione hex ammessa, §0.2) ---------- */
 export function Avatar({ member, size = 28 }: { member?: Pick<Member, 'name' | 'color'>; size?: number }) {
@@ -97,7 +98,7 @@ export function Accordion({ id, title, icon, summary, defaultOpen = false, child
 }
 
 /* ---------- Bottom sheet (§3.4) ---------- */
-export function Sheet({ open, onClose, title, children }: { open: boolean; onClose: () => void; title: string; children: ReactNode }) {
+export function Sheet({ open, onClose, title, children, footer }: { open: boolean; onClose: () => void; title: string; children: ReactNode; footer?: ReactNode }) {
   const controls = useDragControls()
   const { sheets } = useOverlay()
   useEffect(() => {
@@ -126,9 +127,10 @@ export function Sheet({ open, onClose, title, children }: { open: boolean; onClo
             </div>
             <div className="flex items-center justify-between px-5 pb-1">
               <h2 className="text-xl font-bold">{title}</h2>
-              <button onClick={onClose} className="glass-btn !p-2" aria-label="Chiudi"><X size={18} /></button>
+              <button onClick={onClose} className="glass-btn !p-2" aria-label={t('Chiudi')}><X size={18} /></button>
             </div>
-            <div className="overflow-y-auto px-5 pb-8 pt-1 pb-safe">{children}</div>
+            <div className={`overflow-y-auto px-5 pt-1 ${footer ? 'pb-3' : 'pb-8 pb-safe'}`}>{children}</div>
+            {footer && <div className="border-t border-line/60 px-5 pb-6 pt-3 pb-safe">{footer}</div>}
           </motion.div>
         </div>
       )}
@@ -138,7 +140,7 @@ export function Sheet({ open, onClose, title, children }: { open: boolean; onClo
 }
 
 /* ---------- Pulsante a due tocchi per azioni distruttive ---------- */
-export function ConfirmButton({ label, confirmLabel = 'Tocca ancora per confermare', onConfirm, className = '' }: { label: ReactNode; confirmLabel?: string; onConfirm: () => void; className?: string }) {
+export function ConfirmButton({ label, confirmLabel, onConfirm, className = '' }: { label: ReactNode; confirmLabel?: string; onConfirm: () => void; className?: string }) {
   const [armed, setArmed] = useState(false)
   useEffect(() => {
     if (!armed) return
@@ -147,7 +149,7 @@ export function ConfirmButton({ label, confirmLabel = 'Tocca ancora per conferma
   }, [armed])
   return (
     <button type="button" className={`glass-btn btn-danger ${className}`} onClick={() => (armed ? (setArmed(false), onConfirm()) : setArmed(true))}>
-      {armed ? confirmLabel : label}
+      {armed ? (confirmLabel ?? t('Tocca ancora per confermare')) : label}
     </button>
   )
 }

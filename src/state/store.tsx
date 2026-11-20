@@ -1,79 +1,108 @@
 /**
- * Store dei dati: database in memoria + cache locale (localStorage) + sincronizzazione con Google Drive.
- *  - la cache locale è sempre la fonte per il rendering (l'app funziona offline);
- *  - ogni mutazione marca `dirty` e pianifica una sync (debounce);
- *  - la sync parte anche all'apertura, quando si torna online/visibili, ogni 30 s e dal pulsante "Sync".
+ * Store dei dati (stessa architettura di MoneyDuo): il DB vive in memoria (external store) con copia locale in IndexedDB,
+ * il motore di sync (src/sync/engine.ts) lo allinea a Google Drive. Qui anche le notifiche: quelle ricevute (campanella e
+ * avvisi di sistema) e quelle da inviare agli altri membri via push (coda che parte dopo l'invio dei dati a Drive).
  */
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from 'react'
 import type { AppDatabase, Member } from '../types'
+import { t } from '../i18n'
 import { createDemoDb } from '../data/demo'
 import { emptyDb, liveMembers } from '../services/dbOps'
-import { parseDb } from '../services/dbSchema'
 import { mergeDatabases } from '../services/merge'
-import { syncWithDrive } from '../services/syncEngine'
-import * as drive from '../services/googleDriveService'
-import type { DriveConfig } from '../services/googleDriveService'
+import { setActor } from '../lib/actor'
+import { diffNotifications, mergeNotifications, type Notif } from '../lib/notifications'
+import { engine, type SyncState } from '../sync/engine'
+import { PushHttpError, enablePush, pushConfigured, pushSupported, refreshPush, sendPush } from '../sync/push'
+import { enqueue, flushQueue, type QueuedPush, type SendResult } from '../sync/pushQueue'
+import { cacheState, getCacheHealth, getLoadedCache, subscribeCacheHealth, writeCache } from './cache'
 
-export type SyncStatus = 'local' | 'idle' | 'syncing' | 'synced' | 'offline' | 'error' | 'auth'
+const PREFS_KEY = 'mealduo:prefs'
+const NOTIF_PREFIX = 'mealduo:notifs:'
 
-interface Meta {
-  dirty: boolean
-  demo: boolean
-  fileId?: string
-  revision: string
-  lastSyncAt?: string
-  account?: string
-}
-interface Cfg { clientId: string; apiKey: string; appId: string }
-
-const K_DB = 'mealduo:db'
-const K_META = 'mealduo:meta'
-const K_CFG = 'mealduo:cfg'
-
-const ENV_CFG: Cfg = {
-  clientId: import.meta.env.VITE_GOOGLE_CLIENT_ID ?? '',
-  apiKey: import.meta.env.VITE_GOOGLE_API_KEY ?? '',
-  appId: import.meta.env.VITE_GOOGLE_APP_ID ?? '',
-}
-
-function readJson<T>(key: string): T | null {
-  try { const r = localStorage.getItem(key); return r ? (JSON.parse(r) as T) : null } catch { return null }
-}
-function writeJson(key: string, v: unknown): void {
-  try { localStorage.setItem(key, JSON.stringify(v)) } catch { /* quota / private mode */ }
-}
-
-function loadInitial(): { db: AppDatabase; meta: Meta; cfg: Cfg } {
-  let db: AppDatabase | null = null
-  try { const raw = readJson<unknown>(K_DB); if (raw) db = parseDb(raw) } catch { db = null }
-  const meta = readJson<Meta>(K_META)
-  const cfg = { ...ENV_CFG, ...(readJson<Partial<Cfg>>(K_CFG) ?? {}) }
-  if (!db) return { db: createDemoDb(), meta: { dirty: false, demo: true, revision: '' }, cfg }
-  return { db, meta: meta ?? { dirty: false, demo: false, revision: '' }, cfg }
+export interface Prefs {
+  /** notifiche di sistema attive su questo dispositivo */
+  systemNotif: boolean
+  /** notifiche push dal server attive su questo dispositivo */
+  pushEnabled: boolean
 }
 
 export interface Store {
   db: AppDatabase
   members: Member[]
+  /** il membro che corrisponde all'account Google con cui si è entrati (null = non ancora associato) */
+  me: Member | null
+  /** applica una modifica utente: salva in locale e programma la sincronizzazione */
   commit: (fn: (db: AppDatabase) => AppDatabase) => void
-  status: SyncStatus
-  error?: string
-  lastSyncAt?: string
-  fileId?: string
-  demo: boolean
-  account?: string
-  dirty: boolean
-  cfg: Cfg
-  setCfg: (patch: Partial<Cfg>) => void
-  syncNow: (interactive?: boolean) => Promise<void>
-  connect: () => Promise<void>
-  createHouse: (opts: { fresh: boolean }) => Promise<void>
-  joinHouse: (fileId: string) => Promise<void>
-  pickAndJoin: () => Promise<void>
-  disconnect: () => void
-  share: (email: string) => Promise<void>
+  sync: SyncState
+  /** false = non riesco a salvare la copia locale */
+  cacheOk: boolean
+  prefs: Prefs
+  setPrefs: (p: Partial<Prefs>) => void
+  notifications: Notif[]
+  unread: number
+  markRead: (id: string) => void
+  markAllRead: () => void
+  clearNotifications: () => void
+  /** ultimo avviso arrivato mentre l'app è in primo piano (si chiude da solo) */
+  toast: Notif | null
+  dismissToast: () => void
+  centerOpen: boolean
+  setCenterOpen: (open: boolean) => void
+  /** svuota il database (membri, piani, catalogo) */
   startFresh: () => void
+  /** unisce un backup ai dati attuali */
   importDatabase: (db: AppDatabase) => void
+}
+
+/**
+ * Dopo una modifica fatta qui, mette in coda le notifiche push per gli altri membri (stesse regole delle notifiche nell'app).
+ * Partono dopo l'invio dei dati a Drive (flushPush), anche se la modifica è stata fatta offline.
+ */
+function queuePeers(prev: AppDatabase, next: AppDatabase, me: Member | null): void {
+  if (!pushConfigured() || !me?.email) return
+  const fileId = engine.getSnapshot().fileId
+  if (!fileId) return
+  const items: QueuedPush[] = []
+  for (const m of next.members) {
+    if (m.deleted || !m.email || m.id === me.id || m.email.toLowerCase() === me.email.toLowerCase()) continue
+    for (const d of diffNotifications(prev, next, m.id)) {
+      items.push({ key: `${d.id}|${m.email.toLowerCase()}`, fileId, email: m.email, title: d.title, body: d.body, tag: d.tag, at: Date.now(), txId: d.kind === 'extra' ? d.id.slice('extra:'.length) : undefined })
+    }
+  }
+  enqueue(items)
+}
+
+/** Invia le notifiche in coda (i dati sono già su Drive). Errori di rete o del server: si tiene e si riprova al prossimo ciclo. */
+async function flushPush(getDb: () => AppDatabase): Promise<void> {
+  const snap = engine.getSnapshot()
+  const token = engine.currentToken()
+  if (!pushConfigured() || !snap.fileId || !token) return
+  const db = getDb()
+  await flushQueue({
+    fileId: snap.fileId,
+    // se la voce extra è stata eliminata prima dell'invio, la notifica non ha più senso
+    exists: (q) => (q.txId ? db.shopping.extras.some((e) => e.id === q.txId && !e.deleted) : true),
+    send: async (q): Promise<SendResult> => {
+      try { await sendPush(snap.fileId!, token, { recipients: [q.email], title: q.title, body: q.body, tag: q.tag }); return 'ok' } catch (e) {
+        return e instanceof PushHttpError && [400, 403, 404, 413].includes(e.status) ? 'drop' : 'retry'
+      }
+    },
+  })
+}
+
+function loadNotifs(key: string): Notif[] {
+  try { return JSON.parse(localStorage.getItem(key) || '[]') as Notif[] } catch { return [] }
+}
+
+/** Notifica di sistema (Android/desktop/iOS con app installata), mostrata solo se l'app non è in primo piano. */
+async function systemNotify(n: Notif): Promise<void> {
+  if (typeof Notification === 'undefined' || Notification.permission !== 'granted' || document.visibilityState === 'visible') return
+  const opts: NotificationOptions = { body: n.body, icon: './icons/pwa-192.png', badge: './icons/pwa-192.png', tag: n.tag }
+  try {
+    const reg = await navigator.serviceWorker?.getRegistration()
+    if (reg) await reg.showNotification(n.title, opts)
+    else new Notification(n.title, opts)
+  } catch { /* notifiche non disponibili */ }
 }
 
 const Ctx = createContext<Store | null>(null)
@@ -83,200 +112,130 @@ export const useStore = (): Store => {
   return s
 }
 
-const driveCfg = (c: Cfg): DriveConfig => ({ clientId: c.clientId.trim(), apiKey: c.apiKey.trim() || undefined, appId: c.appId.trim() || undefined })
-
 export function StoreProvider({ children }: { children: ReactNode }) {
-  const init = useRef(loadInitial())
-  const dbRef = useRef(init.current.db)
-  const metaRef = useRef(init.current.meta)
-  const cfgRef = useRef(init.current.cfg)
-  const mutations = useRef(0)
-  const syncing = useRef(false)
-  const again = useRef(false)
-  const timer = useRef<number | undefined>(undefined)
+  const dbRef = useRef<AppDatabase>(null as unknown as AppDatabase)
+  if (!dbRef.current) {
+    dbRef.current = getLoadedCache().db ?? createDemoDb()
+    // se la copia locale manca o è datata, il motore rilegge Drive prima di inviare qualsiasi cosa
+    engine.checkCache(cacheState(engine.getSnapshot().remoteVersion))
+  }
+  const listeners = useRef(new Set<() => void>())
+  const subscribeDb = useCallback((l: () => void) => { listeners.current.add(l); return () => { listeners.current.delete(l) } }, [])
+  const db = useSyncExternalStore(subscribeDb, () => dbRef.current)
 
-  const [db, setDb] = useState(dbRef.current)
-  const [meta, setMeta] = useState(metaRef.current)
-  const [cfg, setCfgState] = useState(cfgRef.current)
-  const [status, setStatus] = useState<SyncStatus>(metaRef.current.fileId ? 'idle' : 'local')
-  const [error, setError] = useState<string | undefined>()
+  const meRef = useRef<Member | null>(null)
+  const onRemote = useRef<(prev: AppDatabase, next: AppDatabase) => void>(() => undefined)
 
-  const persist = useCallback((nextDb: AppDatabase, nextMeta: Meta) => {
-    dbRef.current = nextDb
-    metaRef.current = nextMeta
-    setDb(nextDb)
-    setMeta(nextMeta)
-    writeJson(K_DB, nextDb)
-    writeJson(K_META, nextMeta)
+  const apply = useCallback((fn: (prev: AppDatabase) => AppDatabase, dirty: boolean, source?: 'remote') => {
+    const prev = dbRef.current
+    const next = fn(prev)
+    if (next === prev) return
+    dbRef.current = next
+    listeners.current.forEach((l) => l())
+    writeCache(next, engine.getSnapshot().remoteVersion)
+    if (dirty) { engine.markDirty(); queuePeers(prev, next, meRef.current) }
+    if (source === 'remote') onRemote.current(prev, next) // dati arrivati da altri: possibili notifiche
   }, [])
 
-  const syncNow = useCallback(async (interactive = false): Promise<void> => {
-    const m = metaRef.current
-    if (!m.fileId) return
-    if (!navigator.onLine) { setStatus('offline'); return }
-    if (syncing.current) { again.current = true; return }
-    const dc = driveCfg(cfgRef.current)
-    if (!interactive && !drive.hasValidToken()) {
-      try { await drive.getAccessToken(dc.clientId, false) } catch { setStatus('auth'); return }
-    }
-    syncing.current = true
-    setStatus('syncing')
-    setError(undefined)
-    const startMutations = mutations.current
-    try {
-      if (interactive) await drive.getAccessToken(dc.clientId, true)
-      const out = await syncWithDrive({ cfg: dc, fileId: m.fileId, local: dbRef.current, knownRevision: m.revision, dirty: m.dirty })
-      // se l'utente ha modificato qualcosa durante la sync, riunisci e resta "sporco"
-      const changed = mutations.current !== startMutations
-      const finalDb = changed ? mergeDatabases(dbRef.current, out.db) : out.db
-      persist(finalDb, { ...metaRef.current, dirty: changed, demo: false, revision: out.revision, lastSyncAt: new Date().toISOString() })
-      setStatus('synced')
-      if (changed) again.current = true
-    } catch (e) {
-      const err = e as drive.DriveError
-      if (err.status === 401 || /accesso|client id|sessione/i.test(err.message)) setStatus('auth')
-      else if (!navigator.onLine || err instanceof TypeError) setStatus('offline')
-      else setStatus('error')
-      setError(err.message)
-    } finally {
-      syncing.current = false
-      if (again.current) { again.current = false; window.setTimeout(() => void syncNow(false), 400) }
-    }
-  }, [persist])
+  // il motore di sync si collega una sola volta (idempotente con StrictMode)
+  const attached = useRef(false)
+  if (!attached.current) {
+    attached.current = true
+    engine.attach({ getDb: () => dbRef.current, applyDb: apply, afterSync: () => { void flushPush(() => dbRef.current) } })
+  }
 
-  const scheduleSync = useCallback(() => {
-    if (!metaRef.current.fileId) return
-    window.clearTimeout(timer.current)
-    timer.current = window.setTimeout(() => void syncNow(false), 1200)
-  }, [syncNow])
+  const commit = useCallback((fn: (d: AppDatabase) => AppDatabase) => apply(fn, true), [apply])
+  const sync = useSyncExternalStore(engine.subscribe, engine.getSnapshot)
+  const cacheOk = useSyncExternalStore(subscribeCacheHealth, getCacheHealth)
 
-  const commit = useCallback((fn: (d: AppDatabase) => AppDatabase) => {
-    const next = fn(dbRef.current)
-    if (next === dbRef.current) return
-    mutations.current++
-    persist(next, { ...metaRef.current, dirty: true, demo: false })
-    scheduleSync()
-  }, [persist, scheduleSync])
-
-  // sync all'apertura, al ritorno online/visibile e ogni 30 s
+  // quando cambia la versione di Drive a cui corrisponde la copia, si aggiorna anche la copia
+  const lastVersion = useRef<string | null>(sync.remoteVersion)
   useEffect(() => {
-    if (metaRef.current.fileId) void syncNow(false)
-    const onVisible = () => { if (document.visibilityState === 'visible') void syncNow(false) }
-    const onOnline = () => void syncNow(false)
-    const onOffline = () => { if (metaRef.current.fileId) setStatus('offline') }
-    document.addEventListener('visibilitychange', onVisible)
-    window.addEventListener('online', onOnline)
-    window.addEventListener('offline', onOffline)
-    const iv = window.setInterval(() => { if (document.visibilityState === 'visible' && drive.hasValidToken()) void syncNow(false) }, 30_000)
-    return () => {
-      document.removeEventListener('visibilitychange', onVisible)
-      window.removeEventListener('online', onOnline)
-      window.removeEventListener('offline', onOffline)
-      window.clearInterval(iv)
-    }
-  }, [syncNow])
+    if (sync.remoteVersion !== lastVersion.current) { lastVersion.current = sync.remoteVersion; writeCache(dbRef.current, sync.remoteVersion) }
+  }, [sync.remoteVersion])
 
-  const setCfg = useCallback((patch: Partial<Cfg>) => {
-    cfgRef.current = { ...cfgRef.current, ...patch }
-    setCfgState(cfgRef.current)
-    writeJson(K_CFG, cfgRef.current)
-  }, [])
-
-  const run = useCallback(async (fn: () => Promise<void>) => {
-    setError(undefined)
-    setStatus('syncing')
-    try { await fn() } catch (e) {
-      setStatus(metaRef.current.fileId ? 'error' : 'local')
-      setError((e as Error).message)
-      throw e
-    }
-  }, [])
-
-  const afterAuth = useCallback(async (dc: DriveConfig) => {
-    try { const account = await drive.getAccountEmail(dc); persist(dbRef.current, { ...metaRef.current, account }) } catch { /* facoltativo */ }
-  }, [persist])
-
-  const connect = useCallback(async () => {
-    await run(async () => {
-      const dc = driveCfg(cfgRef.current)
-      await drive.getAccessToken(dc.clientId, true)
-      await afterAuth(dc)
-      // se esiste già un DB visibile all'app, collegalo automaticamente
-      if (!metaRef.current.fileId) {
-        const found = await drive.findDbFiles(dc)
-        if (found.length) {
-          const remote = await drive.downloadDb(dc, found[0].id)
-          persist(remote, { ...metaRef.current, fileId: found[0].id, revision: found[0].revision, dirty: false, demo: false, lastSyncAt: new Date().toISOString() })
-        }
-      }
-      setStatus(metaRef.current.fileId ? 'synced' : 'local')
+  const [prefs, setPrefsState] = useState<Prefs>(() => {
+    try { return { systemNotif: false, pushEnabled: false, ...(JSON.parse(localStorage.getItem(PREFS_KEY) || '{}') as Partial<Prefs>) } } catch { return { systemNotif: false, pushEnabled: false } }
+  })
+  const setPrefs = useCallback((p: Partial<Prefs>) => {
+    setPrefsState((old) => {
+      const n = { ...old, ...p }
+      try { localStorage.setItem(PREFS_KEY, JSON.stringify(n)) } catch { /* noop */ }
+      return n
     })
-  }, [run, afterAuth, persist])
-
-  const createHouse = useCallback(async ({ fresh }: { fresh: boolean }) => {
-    await run(async () => {
-      const dc = driveCfg(cfgRef.current)
-      await drive.getAccessToken(dc.clientId, true)
-      const base = fresh ? emptyDb(dbRef.current.houseName === 'Casa Demo' ? 'La nostra casa' : dbRef.current.houseName) : dbRef.current
-      const meta = await drive.createDbFile(dc, base)
-      persist(base, { ...metaRef.current, fileId: meta.id, revision: meta.revision, dirty: false, demo: false, lastSyncAt: new Date().toISOString() })
-      await afterAuth(dc)
-      setStatus('synced')
-    })
-  }, [run, persist, afterAuth])
-
-  const joinHouse = useCallback(async (fileId: string) => {
-    await run(async () => {
-      const dc = driveCfg(cfgRef.current)
-      await drive.getAccessToken(dc.clientId, true)
-      const id = fileId.trim().replace(/^.*\/d\/([^/?#]+).*$/, '$1')
-      const meta = await drive.getMeta(dc, id)
-      const remote = await drive.downloadDb(dc, id)
-      persist(remote, { ...metaRef.current, fileId: id, revision: meta.revision, dirty: false, demo: false, lastSyncAt: new Date().toISOString() })
-      await afterAuth(dc)
-      setStatus('synced')
-    })
-  }, [run, persist, afterAuth])
-
-  const pickAndJoin = useCallback(async () => {
-    const dc = driveCfg(cfgRef.current)
-    setError(undefined)
-    let id: string | null
-    try { id = await drive.pickDbFile(dc) } catch (e) { setError((e as Error).message); throw e }
-    if (id) await joinHouse(id)
-  }, [joinHouse])
-
-  const disconnect = useCallback(() => {
-    drive.signOut()
-    persist(dbRef.current, { ...metaRef.current, fileId: undefined, revision: '', dirty: false, account: undefined })
-    setStatus('local')
-    setError(undefined)
-  }, [persist])
-
-  const share = useCallback(async (email: string) => {
-    const m = metaRef.current
-    if (!m.fileId) throw new Error('Crea o collega prima il database su Drive.')
-    await drive.shareWithEmail(driveCfg(cfgRef.current), m.fileId, email)
   }, [])
-
-  const startFresh = useCallback(() => {
-    mutations.current++
-    persist(emptyDb(), { ...metaRef.current, dirty: !!metaRef.current.fileId, demo: false })
-    scheduleSync()
-  }, [persist, scheduleSync])
-
-  const importDatabase = useCallback((next: AppDatabase) => {
-    mutations.current++
-    persist(mergeDatabases(dbRef.current, next), { ...metaRef.current, dirty: true, demo: false })
-    scheduleSync()
-  }, [persist, scheduleSync])
+  const prefsRef = useRef(prefs)
+  prefsRef.current = prefs
 
   const members = useMemo(() => liveMembers(db), [db])
+  const me = useMemo(() => {
+    const e = sync.email?.toLowerCase()
+    return (e && members.find((m) => m.email?.toLowerCase() === e)) || null
+  }, [members, sync.email])
+  meRef.current = me
+  setActor(me?.id) // le modifiche di questo dispositivo portano l'id dell'autore (`by`)
 
-  const value: Store = {
-    db, members, commit, status, error, cfg, setCfg,
-    lastSyncAt: meta.lastSyncAt, fileId: meta.fileId, demo: meta.demo, account: meta.account, dirty: meta.dirty,
-    syncNow, connect, createHouse, joinHouse, pickAndJoin, disconnect, share, startFresh, importDatabase,
+  // push: a ogni apertura si rinnova l'iscrizione; un messaggio dal service worker (app in primo piano) fa sincronizzare subito
+  useEffect(() => {
+    if (prefs.pushEnabled && sync.fileId && sync.signedIn && pushConfigured()) {
+      const tk = engine.currentToken()
+      if (tk) void refreshPush(sync.fileId, tk).catch(() => undefined)
+    }
+  }, [prefs.pushEnabled, sync.fileId, sync.signedIn])
+  // notifiche già attive su questo dispositivo ma senza push (il server è stato configurato dopo): le iscrive da sole, una volta per apertura
+  const autoPush = useRef(false)
+  useEffect(() => {
+    if (autoPush.current || !prefs.systemNotif || prefs.pushEnabled || !sync.fileId || !sync.signedIn || !pushConfigured() || !pushSupported()) return
+    if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return
+    const tk = engine.currentToken()
+    if (!tk) return
+    autoPush.current = true
+    void enablePush(sync.fileId, tk).then(() => setPrefs({ pushEnabled: true })).catch(() => undefined)
+  }, [prefs.systemNotif, prefs.pushEnabled, sync.fileId, sync.signedIn, setPrefs])
+  useEffect(() => {
+    if (!('serviceWorker' in navigator)) return
+    const onMsg = (e: MessageEvent) => { if (e.data?.type === 'mealduo-push') void engine.syncNow() }
+    navigator.serviceWorker.addEventListener('message', onMsg)
+    return () => navigator.serviceWorker.removeEventListener('message', onMsg)
+  }, [])
+
+  // ----- notifiche ricevute (per casa e per membro, solo su questo dispositivo)
+  const notifKey = sync.fileId && me ? `${NOTIF_PREFIX}${sync.fileId}:${me.id}` : null
+  const [notifications, setNotifications] = useState<Notif[]>([])
+  const [toast, setToast] = useState<Notif | null>(null)
+  const notifKeyRef = useRef<string | null>(null)
+  useEffect(() => { notifKeyRef.current = notifKey; setNotifications(notifKey ? loadNotifs(notifKey) : []) }, [notifKey])
+  useEffect(() => { if (!toast) return; const t = setTimeout(() => setToast(null), 6000); return () => clearTimeout(t) }, [toast])
+  const persistNotifs = useCallback((list: Notif[]) => {
+    const key = notifKeyRef.current
+    if (key) try { localStorage.setItem(key, JSON.stringify(list)) } catch { /* noop */ }
+  }, [])
+
+  onRemote.current = (prev, next) => {
+    const meId = meRef.current?.id
+    if (!meId || !notifKeyRef.current) return
+    const fresh = diffNotifications(prev, next, meId)
+    if (!fresh.length) return
+    setNotifications((cur) => { const merged = mergeNotifications(cur, fresh); persistNotifs(merged); return merged })
+    if (document.visibilityState === 'visible') setToast(fresh[0])
+    else if (prefsRef.current.systemNotif) for (const n of fresh.slice(0, 3)) void systemNotify(n)
   }
+  const markRead = useCallback((id: string) => setNotifications((cur) => { const n = cur.map((x) => (x.id === id ? { ...x, read: true } : x)); persistNotifs(n); return n }), [persistNotifs])
+  const markAllRead = useCallback(() => setNotifications((cur) => { const n = cur.map((x) => ({ ...x, read: true })); persistNotifs(n); return n }), [persistNotifs])
+  const clearNotifications = useCallback(() => { setNotifications([]); persistNotifs([]) }, [persistNotifs])
+  const dismissToast = useCallback(() => setToast(null), [])
+  const [centerOpen, setCenterOpen] = useState(false)
+  const unread = useMemo(() => notifications.filter((n) => !n.read).length, [notifications])
+
+  const startFresh = useCallback(() => {
+    const keepEmail = meRef.current?.email ?? engine.getSnapshot().email ?? undefined
+    apply(() => emptyDb(t('La nostra casa'), meRef.current?.name ?? 'Io', keepEmail), true)
+  }, [apply])
+  const importDatabase = useCallback((next: AppDatabase) => apply((prev) => mergeDatabases(prev, next), true), [apply])
+
+  const value = useMemo<Store>(
+    () => ({ db, members, me, commit, sync, cacheOk, prefs, setPrefs, notifications, unread, markRead, markAllRead, clearNotifications, toast, dismissToast, centerOpen, setCenterOpen, startFresh, importDatabase }),
+    [db, members, me, commit, sync, cacheOk, prefs, setPrefs, notifications, unread, markRead, markAllRead, clearNotifications, toast, dismissToast, centerOpen, startFresh, importDatabase],
+  )
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>
 }

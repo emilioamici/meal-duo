@@ -1,3 +1,4 @@
+import { locale } from '../i18n'
 /** Unità: conversione verso l'unità base per poter sommare (kg→g, l→ml …). */
 
 interface UnitInfo {
@@ -43,15 +44,15 @@ export function round2(n: number): number {
   return Math.round((n + Number.EPSILON) * 100) / 100
 }
 
-const nf = new Intl.NumberFormat('it-IT', { maximumFractionDigits: 2 })
+const nfFor = () => new Intl.NumberFormat(locale(), { maximumFractionDigits: 2 })
 
 /** Formatta una quantità in unità base in modo leggibile: 1500 g → "1,5 kg". */
 export function formatQuantity(quantity: number, unit: string): string {
   const q = round2(quantity)
-  if (unit === 'g' && q >= 1000) return `${nf.format(round2(q / 1000))} kg`
-  if (unit === 'ml' && q >= 1000) return `${nf.format(round2(q / 1000))} l`
-  if (unit === 'pz') return `${nf.format(q)} pz`
-  return `${nf.format(q)} ${unit}`
+  if (unit === 'g' && q >= 1000) return `${nfFor().format(round2(q / 1000))} kg`
+  if (unit === 'ml' && q >= 1000) return `${nfFor().format(round2(q / 1000))} l`
+  if (unit === 'pz') return `${nfFor().format(q)} pz`
+  return `${nfFor().format(q)} ${unit}`
 }
 
 /** Formattazione compatta senza spazio per le etichette per-membro: "560g". */
