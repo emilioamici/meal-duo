@@ -1,6 +1,6 @@
 import { createPortal } from 'react-dom'
 import { AnimatePresence, motion } from 'framer-motion'
-import { Bell, CalendarDays, Cloud, CloudAlert, CloudOff, HousePlus, Loader2, Plus, RefreshCw, ShoppingBasket, Star, Users, UtensilsCrossed } from 'lucide-react'
+import { Bell, CalendarDays, Cloud, CloudAlert, CloudOff, HousePlus, Loader2, Plus, RefreshCw, Settings, ShoppingBasket, Star, UtensilsCrossed } from 'lucide-react'
 import type { ComponentType } from 'react'
 import { useStore } from '../state/store'
 import { engine, type SyncStatus } from '../sync/engine'
@@ -25,7 +25,7 @@ const TABS: { id: Tab; label: string; icon: ComponentType<{ size?: number; strok
   { id: 'today', label: 'Oggi', icon: UtensilsCrossed },
   { id: 'week', label: 'Settimana', icon: CalendarDays },
   { id: 'shop', label: 'Spesa', icon: ShoppingBasket },
-  { id: 'family', label: 'Famiglia', icon: Users },
+  { id: 'settings', label: 'Impostazioni', icon: Settings },
 ]
 
 export function BottomNav({ shopBadge }: { shopBadge: number }) {
@@ -111,7 +111,7 @@ export function NotificationBell() {
 
 /** Azioni a destra dell'header di ogni schermata. */
 export function HeaderActions() {
-  return <><NotificationBell /><SyncPill /></>
+  return <><SyncPill /><NotificationBell /></>
 }
 
 /* ---------- Toast ---------- */

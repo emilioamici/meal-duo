@@ -58,7 +58,7 @@ Dalla cartella del progetto:
 In GitHub, *Settings → Secrets and variables → Actions → Variables*, crea `VITE_PUSH_URL` (indirizzo del server, senza `/` finale) e `VITE_VAPID_PUBLIC_KEY` (la chiave pubblica). Poi rilancia il deploy (*Actions → Deploy → Run workflow*). Sono valori pubblici e vengono inseriti nell'app alla pubblicazione: nessun utente deve inserire nulla. Non c'è più un campo nell'app per modificarli.
 
 ## Attivarle sui dispositivi
-Su ogni telefono o computer: *Famiglia → Notifiche → Attiva notifiche* (un solo interruttore: attiva sia le notifiche del dispositivo sia, se il server è configurato, il push anche con l'app chiusa), poi concedi il permesso. Premi *Invia una notifica di prova* per verificare. Chi aveva già le notifiche attive viene iscritto al server da solo alla prima apertura dopo la configurazione; se il server non risponde compare «Riprova ad attivarle anche con l'app chiusa».
+Su ogni telefono o computer: *Impostazioni → Notifiche → Attiva notifiche* (un solo interruttore: attiva sia le notifiche del dispositivo sia, se il server è configurato, il push anche con l'app chiusa), poi concedi il permesso. Premi *Invia una notifica di prova* per verificare. Chi aveva già le notifiche attive viene iscritto al server da solo alla prima apertura dopo la configurazione; se il server non risponde compare «Riprova ad attivarle anche con l'app chiusa».
 
 - **iPhone:** serve iOS 16.4 o successivo e l'app **aggiunta alla schermata Home** (Safari → Condividi → Aggiungi a Home). Dalle semplici pagine di Safari il push non funziona.
 - **Android e computer:** funziona anche da browser.
@@ -91,7 +91,7 @@ Poi:
 - apri `…/health` nel browser: deve comparire `{"ok":true,"auth":true}`.
 
 **3. App**
-Non serve altro (l'app usa lo stesso indirizzo del server delle notifiche). Sulle nuove installazioni «Accedi con Google» passa dal Worker. Dove sei già dentro: *Famiglia → Google Drive & Sync → Attiva l'accesso persistente*. Dopo il consenso su Google l'app ricompare con «Accesso persistente attivo».
+Non serve altro (l'app usa lo stesso indirizzo del server delle notifiche). Sulle nuove installazioni «Accedi con Google» passa dal Worker. Dove sei già dentro: *Impostazioni → Sincronizzazione e account → Attiva l'accesso persistente*. Dopo il consenso su Google l'app ricompare con «Accesso persistente attivo».
 
 **Come si gestisce**
 - *Esci* elimina la sessione **di quel dispositivo**. Il token di rinnovo non viene revocato su Google, perché scollegherebbe anche gli altri dispositivi.

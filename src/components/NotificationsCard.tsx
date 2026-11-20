@@ -96,7 +96,7 @@ export function NotificationsCard() {
       )}
       <p className="mt-3 text-xs text-muted">
         {server ? t('Con l\'app chiusa le notifiche arrivano dal Worker.') : t('Senza il Worker il sito non può svegliare il telefono: le notifiche arrivano mentre l\'app è aperta o in background (si controlla ogni 2 minuti) e quelle perse le trovi alla riapertura.')}
-        {' '}{sync.persistent ? t('L\'accesso persistente tiene attiva la sessione Google anche in background.') : t('La sessione Google dura 1 ora: con l\'accesso persistente (scheda Google Drive) non serve rinnovarla.')}
+        {' '}{sync.persistent ? t('L\'accesso persistente tiene attiva la sessione Google anche in background.') : t('La sessione Google dura 1 ora: con l\'accesso persistente (Impostazioni → Sincronizzazione e account) non serve rinnovarla.')}
       </p>
     </div>
   )

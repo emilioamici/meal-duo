@@ -1,4 +1,6 @@
 export type Theme = 'auto' | 'light' | 'dark'
+/** Nomi mostrati (passano da t()): Mochi = tema chiaro, Zenitsu = tema scuro. */
+export const THEME_NAME: Record<Theme, string> = { auto: 'Automatico', light: 'Mochi (Chiaro)', dark: 'Zenitsu (Scuro)' }
 export const THEME_COLOR = { light: '#fff7ee', dark: '#16181d' } // = --bg dei due temi
 const KEY = 'mealduo:theme'
 
