@@ -18,6 +18,7 @@ export function parseDb(raw: unknown): AppDatabase {
     name: str(m.name, 'Membro'),
     color: str(m.color, '#c9692a'),
     email: typeof m.email === 'string' && m.email ? m.email : undefined,
+    joinedAt: typeof m.joinedAt === 'string' && m.joinedAt ? m.joinedAt : undefined,
     by: by(m.by),
     updatedAt: iso(m.updatedAt),
     deleted: m.deleted === true ? true : undefined,

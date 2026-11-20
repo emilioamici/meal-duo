@@ -1,17 +1,18 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { Bell, Check, Cloud, Database, FileJson, Home, Mail, Palette, Pencil, Plus, Search, ShieldCheck, Trash2, UserRound, Utensils } from 'lucide-react'
-import { Accordion, Avatar, ConfirmButton, PageHeader, Sheet } from '../components/ui'
+import { useMemo, useRef, useState } from 'react'
+import { Bell, Cloud, Database, FileJson, Palette, Search, ShieldCheck, Trash2, Users, Utensils } from 'lucide-react'
+import { Accordion, ConfirmButton, PageHeader, Sheet } from '../components/ui'
 import { HeaderActions } from '../components/Chrome'
 import { MascotPeek } from '../components/Mascots'
 import { useStore } from '../state/store'
 import { useUi } from '../state/ui'
-import type { FoodCatalogItem, Member } from '../types'
-import { addMember, deleteFood, foodUsage, liveFoods, MEMBER_COLORS, mergeFoods, removeMember, renameHouse, updateFood, updateMember } from '../services/dbOps'
+import type { FoodCatalogItem } from '../types'
+import { deleteFood, foodUsage, liveFoods, mergeFoods, updateFood } from '../services/dbOps'
 import { parseDb } from '../services/dbSchema'
 import { findDuplicatePairs, FOOD_CATEGORIES, normalizeName, searchFoods } from '../lib/foodMatch'
 import { COMMON_UNITS } from '../lib/units'
 import { downloadJson, readFileText } from '../lib/files'
 import { THEME_NAME, getTheme } from '../lib/theme'
+import { FamilyCard } from '../components/FamilyCard'
 import { AppearanceCard } from '../components/AppearanceCard'
 import { MemberPills } from '../components/MemberPills'
 import { PlanJsonCard } from '../components/PlanJsonCard'
@@ -19,33 +20,22 @@ import { useActiveMember } from '../state/hooks'
 import { LANG_NAME, getLangPref, useLang } from '../i18n'
 import { SyncCard } from '../components/SyncCard'
 import { NotificationsCard } from '../components/NotificationsCard'
-import { engine } from '../sync/engine'
-import { isPristine } from '../services/dbOps'
-import { tb } from '../i18n/rich'
 import { t, tp } from '../i18n'
 
-/** Campo che salva solo quando si esce (come in Clean Duo): niente scritture a ogni tasto. */
-function CommitInput({ value, onCommit, ...rest }: { value: string; onCommit: (v: string) => void } & Omit<React.InputHTMLAttributes<HTMLInputElement>, 'value' | 'onChange'>) {
-  const [v, setV] = useState(value)
-  useEffect(() => setV(value), [value])
-  return <input {...rest} className="field" value={v} onChange={(e) => setV(e.target.value)} onBlur={() => v !== value && onCommit(v)} onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()} />
-}
-
-/** Impostazioni: stessa struttura di Clean Duo (Aspetto sotto i gattini, poi Casa, Membri, Sincronizzazione, Notifiche, Dati). */
+/** Impostazioni: stessa struttura di MoneyDuo e Clean Duo (Aspetto sotto i gattini, Famiglia, Sincronizzazione e account, Notifiche, …). */
 export function SettingsView() {
   useLang()
   const [, refresh] = useState(0) // il riepilogo di Aspetto legge tema e lingua dal dispositivo: si ridisegna a ogni cambio
   const { db, members, sync, prefs } = useStore()
   const { setMemberId } = useUi()
-  const { commit } = useStore()
   const member = useActiveMember()
   const foods = liveFoods(db)
   const lp = getLangPref()
   const themeLabel = t(THEME_NAME[getTheme()])
-  const syncSummary = !sync.fileId ? (isPristine(db) ? t('Modalità demo · dati solo su questo dispositivo') : t('Non collegato · dati solo su questo dispositivo')) : t('Collegato · {email}', { email: sync.email ?? '' })
+  const syncSummary = `${t(SYNC_LABEL[sync.status])}${sync.email ? ` · ${sync.email}` : ''}`
   return (
     <>
-      <PageHeader title={t('Impostazioni')} subtitle={t('Casa, membri e sincronizzazione')} right={<HeaderActions />} />
+      <PageHeader title={t('Impostazioni')} subtitle={t('Famiglia, sincronizzazione e dati')} right={<HeaderActions />} />
       <div className="space-y-3">
         <MascotPeek kind="pair">
           <Accordion id="look" title={t('Aspetto')} icon={<Palette size={20} />} summary={`${themeLabel} · ${lp === 'auto' ? t('Automatico') : LANG_NAME[lp]}`}>
@@ -53,13 +43,8 @@ export function SettingsView() {
           </Accordion>
         </MascotPeek>
 
-        <Accordion id="house" title={t('Casa')} icon={<Home size={20} />} summary={db.houseName}>
-          <label className="label !mt-0">{t('Nome della casa')}</label>
-          <CommitInput value={db.houseName} onCommit={(v) => v.trim() && commit((d) => renameHouse(d, v))} />
-        </Accordion>
-
-        <Accordion id="members" title={t('Membri della casa')} icon={<UserRound size={20} />} summary={tp(members.length, '{n} membro', '{n} membri', { n: members.length })}>
-          <MembersSection />
+        <Accordion id="family" title={t('Famiglia')} icon={<Users size={20} />} summary={`${db.houseName} · ${tp(members.length, '{n} membro', '{n} membri', { n: members.length })}`}>
+          <FamilyCard />
         </Accordion>
 
         <Accordion id="sync" title={t('Sincronizzazione e account')} icon={<Cloud size={20} />} summary={syncSummary}>
@@ -79,7 +64,7 @@ export function SettingsView() {
           <PlanJsonCard bare />
         </Accordion>
 
-        <Accordion id="data" title={t('Dati')} icon={<Database size={20} />} summary={t('{a} alimenti · {b} membri', { a: foods.length, b: members.length })}>
+        <Accordion id="data" title={t('Backup e dati')} icon={<Database size={20} />} summary={t('{a} alimenti · {b} membri', { a: foods.length, b: members.length })}>
           <DataSection />
         </Accordion>
 
@@ -89,126 +74,7 @@ export function SettingsView() {
   )
 }
 
-/* =============== Membri =============== */
-function MembersSection() {
-  const { members, sync, me } = useStore()
-  const [sheet, setSheet] = useState<{ member?: Member } | null>(null)
-  const [invite, setInvite] = useState(false)
-  const owner = sync.ownerEmail?.toLowerCase()
-  return (
-    <div>
-      <ul className="divide-y divide-line/60">
-        {members.map((m) => (
-          <li key={m.id} className="flex items-center gap-3 py-2.5">
-            <Avatar member={m} size={40} />
-            <div className="min-w-0 flex-1"><p className="truncate font-semibold leading-tight">{m.name}{!!owner && m.email?.toLowerCase() === owner && <span className="ml-2 rounded-full bg-brand/10 px-2 py-0.5 text-[11px] font-semibold">{t('proprietario')}</span>}</p><p className="truncate text-xs text-muted">{m.email || t('nessuna email')}</p></div>
-            {me?.id === m.id && <span className="chip chip-active !py-1 !text-xs"><Check size={14} />{t('Io')}</span>}
-            <button className="glass-btn !h-10 !w-10 !p-0" aria-label={t('Modifica {name}', { name: m.name })} onClick={() => setSheet({ member: m })}><Pencil size={16} /></button>
-          </li>
-        ))}
-      </ul>
-      <button className="glass-btn mt-3 w-full" onClick={() => setSheet({})}><Plus size={16} />{t('Aggiungi membro')}</button>
-      {sync.fileId && sync.canShare && <button className="glass-btn btn-primary mt-2 w-full" onClick={() => setInvite(true)}><Mail size={16} />{t('Invita con Google Drive')}</button>}
-      {sync.fileId && !sync.canShare && <p className="mt-2 px-1 text-xs text-muted">{t('Solo il proprietario ({email}) può invitare o rimuovere persone dal database su Drive.', { email: sync.ownerEmail ?? t('altro account') })}</p>}
-      <MemberSheet open={!!sheet} member={sheet?.member} onClose={() => setSheet(null)} />
-      <InviteSheet open={invite} onClose={() => setInvite(false)} />
-    </div>
-  )
-}
-
-function MemberSheet({ open, member, onClose }: { open: boolean; member?: Member; onClose: () => void }) {
-  const { members, commit, sync } = useStore()
-  const { setMemberId, showToast } = useUi()
-  const [name, setName] = useState('')
-  const [email, setEmail] = useState('')
-  const [color, setColor] = useState(MEMBER_COLORS[0])
-  const [key, setKey] = useState('')
-  const k = member?.id ?? 'new'
-  if (open && key !== k + open) { setKey(k + open); setName(member?.name ?? ''); setEmail(member?.email ?? ''); setColor(member?.color ?? MEMBER_COLORS[members.length % MEMBER_COLORS.length]) }
-  const save = () => {
-    if (!name.trim()) return
-    if (member) commit((d) => updateMember(d, member.id, { name: name.trim(), email: email.trim() || undefined, color }))
-    else {
-      let id = ''
-      commit((d) => { const r = addMember(d, name, color, email); id = r.member.id; return r.db })
-      if (id) setMemberId(id)
-    }
-    onClose()
-  }
-  return (
-    <Sheet open={open} onClose={onClose} title={member ? t('Modifica membro') : t('Nuovo membro')}
-      footer={<button className="glass-btn btn-primary w-full !py-3.5" disabled={!name.trim()} onClick={save}>{t('Salva')}</button>}>
-      <label className="label !mt-2">{t('Nome')}</label>
-      <input className="field" value={name} autoFocus={!member} onChange={(e) => setName(e.target.value)} />
-      <label className="label">{t('Email Google (facoltativa)')}</label>
-      <input className="field" type="email" value={email} autoCapitalize="none" onChange={(e) => setEmail(e.target.value)} />
-      <label className="label">{t('Colore')}</label>
-      <div className="flex flex-wrap gap-3 px-1">
-        {MEMBER_COLORS.map((c) => (
-          <button key={c} type="button" aria-label={t('Colore {c}', { c })} aria-pressed={color === c} onClick={() => setColor(c)}
-            className="flex h-10 w-10 items-center justify-center rounded-full text-white transition active:scale-90" style={{ background: c }}>
-            {color === c && <Check size={18} strokeWidth={3} />}
-          </button>
-        ))}
-      </div>
-      {member && members.length > 1 && (
-        <ConfirmButton className="mt-2 w-full" label={<><Trash2 size={16} />{t('Rimuovi membro')}</>} confirmLabel={member.email && sync.canShare ? t('Tocca ancora: perderà l\'accesso a Drive e il suo piano verrà eliminato') : t('Tocca ancora: il suo piano verrà eliminato')}
-          onConfirm={async () => {
-            // il proprietario revoca anche l'accesso al file su Drive
-            if (member.email && sync.canShare) { try { await engine.revoke(member.email) } catch (e) { showToast((e as Error).message) } }
-            commit((d) => removeMember(d, member.id)); onClose()
-          }} />
-      )}
-    </Sheet>
-  )
-}
-
-function InviteSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const { db, members, commit } = useStore()
-  const { showToast } = useUi()
-  const [email, setEmail] = useState('')
-  const [name, setName] = useState('')
-  const [target, setTarget] = useState('new') // 'new' = nuovo membro, altrimenti id di un membro esistente senza account
-  const [busy, setBusy] = useState(false)
-  const [err, setErr] = useState('')
-  const unclaimed = members.filter((m) => !m.email)
-  const valid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())
-
-  const send = async () => {
-    setBusy(true); setErr('')
-    try {
-      const mail = email.trim()
-      if (members.some((m) => m.email?.toLowerCase() === mail.toLowerCase())) throw new Error(t('Questa persona è già nella casa.'))
-      await engine.invite(mail, db.houseName)
-      const claimed = target !== 'new' ? members.find((m) => m.id === target) : undefined
-      // l'invito si collega a un membro già presente (es. dopo un import) invece di crearne uno duplicato
-      commit((d) => (claimed ? updateMember(d, claimed.id, { email: mail }) : addMember(d, name.trim() || mail.split('@')[0], MEMBER_COLORS[d.members.length % MEMBER_COLORS.length], mail).db))
-      void engine.syncNow() // il membro invitato deve essere su Drive prima che l'invitato acceda
-      showToast(t('Invito inviato a {mail}', { mail }))
-      setEmail(''); setName(''); setTarget('new'); onClose()
-    } catch (e) { setErr((e as Error).message) } finally { setBusy(false) }
-  }
-
-  return (
-    <Sheet open={open} onClose={onClose} title={t('Invita un familiare')}
-      footer={<button className="glass-btn btn-primary w-full !py-3.5" disabled={!valid || busy} onClick={() => void send()}><Mail size={16} />{t('Invia invito')}</button>}>
-      <p className="text-sm text-muted">{tb('Drive concede il ruolo <b>Editor</b> sul database e manda l\'email di invito. Il familiare, in Meal Duo, accede con Google e sceglie il database condiviso (Picker).')}</p>
-      {err && <p role="alert" className="mt-3 rounded-xl bg-exp/15 p-3 text-sm"><span className="font-bold text-exp">{t('Errore:')}{' '}</span>{err}</p>}
-      <label className="label">{t('Email Google')}</label>
-      <input className="field" type="email" value={email} autoCapitalize="none" placeholder={t('nome@gmail.com')} onChange={(e) => setEmail(e.target.value)} />
-      {unclaimed.length > 0 && (
-        <>
-          <label className="label">{t('Chi è?')}</label>
-          <div className="-mx-1 flex flex-wrap gap-2 px-1">
-            <button className={`chip ${target === 'new' ? 'chip-active' : ''}`} onClick={() => setTarget('new')}>{t('Nuovo membro')}</button>
-            {unclaimed.map((m) => <button key={m.id} className={`chip !pl-1.5 ${target === m.id ? 'chip-active' : ''}`} onClick={() => setTarget(m.id)}><Avatar member={m} size={22} />{m.name}</button>)}
-          </div>
-        </>
-      )}
-      {target === 'new' && (<><label className="label">{t('Nome')}</label><input className="field" value={name} placeholder={t('es. Sara')} onChange={(e) => setName(e.target.value)} /></>)}
-    </Sheet>
-  )
-}
+const SYNC_LABEL: Record<string, string> = { off: 'Non collegato', auth: 'Riconnessione necessaria', pending: 'Da sincronizzare', syncing: 'Sincronizzazione…', synced: 'Sincronizzato', offline: 'Offline', error: 'Errore' }
 
 /* =============== Catalogo alimenti =============== */
 function CatalogSection() {

@@ -133,6 +133,23 @@ export function ConnectFlow({ active, reconnect = false, onClose, allowLocal = f
         <>
           <p className="text-sm">{tb('Nessuna casa trovata per <b>{email}</b>.', { email: sync.email ?? t('questo account') })}</p>
 
+          {pickerConfigured() ? (
+            <div className="mt-3 space-y-2 rounded-2xl border border-line bg-bg/60 p-3">
+              <p className="flex items-center gap-2 text-sm font-semibold"><Folder size={16} className="text-brand" />{t('Hai ricevuto un invito?')}</p>
+              <p className="text-xs text-muted">{t('Il proprietario ha condiviso il database con te: scegli quel file su Drive (lo trovi in «Condivisi con me»). Lo si fa una volta sola.')}</p>
+              <button className="glass-btn btn-primary w-full" disabled={busy} onClick={() => void guard(async () => { const f = await engine.pickDatabase(); if (f) await connect(f.id) })}><Folder size={18} />{t('Scegli il database della casa')}</button>
+            </div>
+          ) : (
+            <details className="mt-3 text-sm">
+              <summary className="cursor-pointer text-muted">{t('Ho il link o l\'ID del file')}</summary>
+              <p className="mt-2 text-xs text-muted">{t('Senza il Picker (API Key e App ID) l\'app vede solo i file creati da lei: per un file di un altro account configura il Picker (README §3).')}</p>
+              <div className="mt-2 flex gap-2">
+                <input className="field" placeholder={t('Link o ID del file Drive')} value={link} autoCapitalize="none" spellCheck={false} onChange={(e) => setLink(e.target.value)} />
+                <button className="glass-btn btn-primary" disabled={busy || !parseFileId(link)} onClick={() => void guard(() => connect(parseFileId(link)!))}><Link2 size={16} />{t('Collega')}</button>
+              </div>
+            </details>
+          )}
+
           <div className="mt-3 space-y-1 rounded-2xl border border-line bg-bg/60 p-3">
             <p className="flex items-center gap-2 text-sm font-semibold"><Users size={16} className="text-brand" />{t('Crea la tua casa')}</p>
             <p className="text-xs text-muted">{t('Il database sarà un file nel tuo Drive: tu sei il proprietario e inviti gli altri dalle Impostazioni.')}</p>
@@ -156,23 +173,6 @@ export function ConnectFlow({ active, reconnect = false, onClose, allowLocal = f
               onClick={() => void guard(async () => { await engine.createHouse({ houseName, memberName: myName, folderId: folder.id === 'root' ? null : folder.id, keepLocal }); done(t('Casa creata su Drive')) })}>
               {busy ? <Loader2 size={18} className="animate-spin" /> : <Users size={18} />}{t('Crea casa')}</button>
           </div>
-
-          {pickerConfigured() ? (
-            <div className="mt-3 space-y-2 rounded-2xl border border-line bg-bg/60 p-3">
-              <p className="flex items-center gap-2 text-sm font-semibold"><Folder size={16} className="text-brand" />{t('Hai ricevuto un invito?')}</p>
-              <p className="text-xs text-muted">{t('Il proprietario ha condiviso il database con te: scegli quel file su Drive (lo trovi in «Condivisi con me»). Lo si fa una volta sola.')}</p>
-              <button className="glass-btn btn-primary w-full" disabled={busy} onClick={() => void guard(async () => { const f = await engine.pickDatabase(); if (f) await connect(f.id) })}><Folder size={18} />{t('Scegli il database della casa')}</button>
-            </div>
-          ) : (
-            <details className="mt-3 text-sm">
-              <summary className="cursor-pointer text-muted">{t('Ho il link o l\'ID del file')}</summary>
-              <p className="mt-2 text-xs text-muted">{t('Senza il Picker (API Key e App ID) l\'app vede solo i file creati da lei: per un file di un altro account configura il Picker (README §3).')}</p>
-              <div className="mt-2 flex gap-2">
-                <input className="field" placeholder={t('Link o ID del file Drive')} value={link} autoCapitalize="none" spellCheck={false} onChange={(e) => setLink(e.target.value)} />
-                <button className="glass-btn btn-primary" disabled={busy || !parseFileId(link)} onClick={() => void guard(() => connect(parseFileId(link)!))}><Link2 size={16} />{t('Collega')}</button>
-              </div>
-            </details>
-          )}
 
           <p className="mt-3 text-sm text-muted">{tb('Aspetti un invito? Chiedi al proprietario di aggiungere <b>{email}</b>, poi', { email: sync.email ?? t('la tua email') })}<button className="ml-1 inline-flex items-center gap-1 font-semibold text-brand" disabled={busy} onClick={() => void search()}><RefreshCw size={14} />{t('cerca di nuovo')}</button>.</p>
 
