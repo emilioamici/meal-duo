@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 440 380">
+  <!-- SEGNAPOSTO: coppia di gattini (sostituire con il PNG definitivo) -->
+  <ellipse cx="150" cy="290" rx="100" ry="80" fill="#6a7080" stroke="#43322a" stroke-width="4"/>
+  <ellipse cx="290" cy="290" rx="100" ry="80" fill="#fffaf2" stroke="#43322a" stroke-width="4"/>
+  <path d="M80 190 L72 90 L140 140 Z" fill="#6a7080" stroke="#43322a" stroke-width="4" stroke-linejoin="round"/>
+  <path d="M215 190 L220 90 L160 140 Z" fill="#6a7080" stroke="#43322a" stroke-width="4" stroke-linejoin="round"/>
+  <ellipse cx="148" cy="180" rx="76" ry="62" fill="#6a7080" stroke="#43322a" stroke-width="4"/>
+  <path d="M225 190 L220 90 L280 140 Z" fill="#fffaf2" stroke="#43322a" stroke-width="4" stroke-linejoin="round"/>
+  <path d="M360 190 L368 90 L300 140 Z" fill="#fffaf2" stroke="#43322a" stroke-width="4" stroke-linejoin="round"/>
+  <ellipse cx="292" cy="180" rx="76" ry="62" fill="#fffaf2" stroke="#43322a" stroke-width="4"/>
+  <path d="M108 176 q10 -12 20 0 M158 176 q10 -12 20 0 M252 176 q10 -12 20 0 M302 176 q10 -12 20 0" fill="none" stroke="#43322a" stroke-width="4" stroke-linecap="round"/>
+  <path d="M140 196 q4 6 8 0 q4 6 8 0 M284 196 q4 6 8 0 q4 6 8 0" fill="none" stroke="#43322a" stroke-width="3" stroke-linecap="round"/>
+  <path d="M100 232 Q148 252 196 232 M244 232 Q292 252 340 232" fill="none" stroke="#e8b4bc" stroke-width="12" stroke-linecap="round"/>
+  <circle cx="148" cy="246" r="8" fill="#e6bb78" stroke="#43322a" stroke-width="2.5"/>
+  <circle cx="292" cy="246" r="8" fill="#e6bb78" stroke="#43322a" stroke-width="2.5"/>
+</svg>

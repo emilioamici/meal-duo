@@ -1,0 +1,57 @@
+name: Deploy su GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Un solo deploy alla volta; non interrompere quello in corso
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Test (motore spesa, merge, import/export, sync)
+        run: npm test
+
+      - name: Build
+        run: npm run build
+        env:
+          # Il base path (/<nome-repo>/) è ricavato automaticamente da GITHUB_REPOSITORY in vite.config.ts.
+          # Per un dominio personalizzato imposta la variabile di repository VITE_BASE = /
+          VITE_BASE: ${{ vars.VITE_BASE }}
+          # Facoltativi (valori pubblici): impostali in Settings → Secrets and variables → Actions → Variables
+          VITE_GOOGLE_CLIENT_ID: ${{ vars.VITE_GOOGLE_CLIENT_ID }}
+          VITE_GOOGLE_API_KEY: ${{ vars.VITE_GOOGLE_API_KEY }}
+          VITE_GOOGLE_APP_ID: ${{ vars.VITE_GOOGLE_APP_ID }}
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
