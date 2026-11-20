@@ -84,7 +84,7 @@ Con `drive.file` un invitato non vede il file creato da altri. Il Worker fa da p
 
 1. Chi ha creato la famiglia (ruolo `owner`, con sessione persistente) la registra: `POST /house/register`. Si ripete ogni 3 giorni e subito dopo ogni invito.
 2. Un invitato chiede `GET /house/mine` e riceve le famiglie che gli sono state condivise; poi legge con `/db/meta` e `/db/read` e scrive con `/db/write` (con `expectedVersion`: se il file è cambiato risponde `409` e il client rifà il merge).
-3. A ogni chiamata il Worker usa il refresh token del proprietario per leggere i permessi del file e controlla che l'email del chiamante sia presente, con token emesso per l'app (`ALLOWED_CLIENT_IDS`). **Per scrivere serve il ruolo owner/writer** (differenza voluta rispetto a Clean Duo). Il contenuto transita dal Worker ma non vi è conservato.
+3. A ogni chiamata il Worker usa il refresh token del proprietario per leggere i permessi del file e controlla che l'email del chiamante sia presente, con token emesso per il tuo `GOOGLE_CLIENT_ID` (`ALLOWED_CLIENT_IDS` è facoltativa, per altri Client ID). **Per scrivere serve il ruolo owner/writer** (differenza voluta rispetto a Clean Duo). Il contenuto transita dal Worker ma non vi è conservato.
 
 Il link d'invito e l'ID famiglia (`src/sync/invite.ts`, chiave `mealduo:joinId`) servono a chi accede dal ponte o dal Picker ristretto.
 
