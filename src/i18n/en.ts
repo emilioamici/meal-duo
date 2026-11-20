@@ -376,4 +376,5 @@ export const EN: Record<string, string> = {
   "Pane, pasta e cereali": "Bread, pasta & grains",
   "Dispensa": "Pantry",
   "Surgelati e altro": "Frozen & other",
+  "Informativa sulla privacy": "Privacy policy",
 }

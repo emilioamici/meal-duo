@@ -206,6 +206,15 @@ Le chiamate cross-origin (Google) non vengono mai intercettate né messe in cach
 ### 8.1 Google Cloud Console
 1. Crea un progetto; abilita **Google Drive API** (e **Google Picker API** per il Picker).
 2. **Schermata consenso OAuth**: tipo *Esterno*, scope `.../auth/drive.file` (non sensibile → nessuna verifica). Per l'accesso persistente: **Pubblica l'app** (in *Testing* i refresh token scadono dopo 7 giorni). In produzione senza verifica compare «app non verificata»: *Avanzate → Vai a Meal Duo*.
+   - **Branding** (obbligatorio per pubblicare: senza, il pulsante *Pubblica app* resta grigio con il messaggio «devi inserire le informazioni mancanti»). In *Google Auth Platform → Branding* compila:
+     - **Nome dell'app:** `Meal Duo`
+     - **Email di assistenza** e **email di contatto dello sviluppatore:** il tuo indirizzo
+     - **Home page dell'app:** `https://<utente>.github.io/<repo>/` (es. `https://emilioamici.github.io/meal-duo/`)
+     - **Norme sulla privacy:** `https://<utente>.github.io/<repo>/privacy.html` (la pagina è inclusa nell'app: `public/privacy.html`)
+     - *(facoltativi)* logo (puoi usare `assets/icon-source.png`) e condizioni di servizio.
+
+     Prima di salvare apri i due indirizzi dal browser: l'app deve essere già pubblicata su GitHub Pages (merge + deploy), altrimenti rispondono 404. Se Google chiede i **domini autorizzati**, `github.io` non è un dominio tuo e potrebbe essere rifiutato: in quel caso serve un dominio personalizzato per Pages (con lo scope `drive.file` non è richiesta la verifica dell'app, ma i link devono essere validi).
+     Poi, in *Pubblico*, premi **Pubblica app** (stato *In produzione*).
 3. **ID client OAuth → Applicazione web**:
    - Origini JS autorizzate: `http://localhost:5173`, `https://<utente>.github.io` (solo schema+dominio).
    - **URI di reindirizzamento** (solo con il Worker): `https://<worker>.workers.dev/auth/callback`.
@@ -250,6 +259,7 @@ Poi **Settings → Pages → Source: GitHub Actions** e rilancia il deploy.
 | Sintomo | Causa / rimedio |
 |---|---|
 | `redirect_uri_mismatch` | l'URI in Google Cloud ≠ `https://<worker>/auth/callback` (schema e percorso inclusi) |
+| *Pubblica app* grigio («devi inserire le informazioni mancanti») | compila *Branding*: nome, email di assistenza, home page e URL dell'informativa privacy (`…/privacy.html`) |
 | «Google non ha rilasciato il token di rinnovo» | app già autorizzata: rimuovi l'accesso su myaccount.google.com/permissions e riprova |
 | Dopo 7 giorni chiede di nuovo l'accesso | app ancora in *Testing*: pubblicala |
 | «Origine non autorizzata» (403) | `ALLOWED_ORIGINS` deve essere l'origine esatta (`https://utente.github.io`, senza percorso) |

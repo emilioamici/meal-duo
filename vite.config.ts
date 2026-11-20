@@ -50,7 +50,7 @@ export default defineConfig({
         globPatterns: ['**/*.{js,css,html,svg,png,ico,webmanifest}'],
         navigateFallback: `${base}index.html`,
         // Le API Google non vanno mai messe in cache dal service worker
-        navigateFallbackDenylist: [/^\/api\//],
+        navigateFallbackDenylist: [/^\/api\//, /privacy\.html$/],
         cleanupOutdatedCaches: true,
         // gestori delle notifiche push (public/push-sw.js), caricati dal service worker generato
         importScripts: ['push-sw.js'],
