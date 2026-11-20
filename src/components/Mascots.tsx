@@ -1,0 +1,29 @@
+import type { ReactNode } from 'react'
+
+export type Mascot = 'zenitsu' | 'mochi' | 'pair'
+/**
+ * TODO(asset): i file in public/cats sono SEGNAPOSTO in SVG. Sostituirli con i PNG definitivi
+ * (stesso nome, estensione .png) e aggiornare FILE qui sotto — vedi DESIGN_SYSTEM.md §4.5.
+ */
+const FILE: Record<Mascot, string> = { zenitsu: 'cats/zenitsu.svg', mochi: 'cats/mochi.svg', pair: 'cats/pair.svg' }
+
+export function MascotImg({ kind, className = '' }: { kind: Mascot; className?: string }) {
+  return <img src={import.meta.env.BASE_URL + FILE[kind]} alt="" draggable={false} decoding="async" className={`pointer-events-none select-none ${className}`} />
+}
+
+/** Il gattino fa capolino da dietro il bordo superiore di una scheda. `pair` = tutti e due, uno per lato. */
+export function MascotPeek({ kind, side = 'right', children }: { kind: Mascot; side?: 'left' | 'right'; children: ReactNode }) {
+  return (
+    <div className="relative pt-11">
+      {kind === 'pair' ? (
+        <>
+          <MascotImg kind="zenitsu" className="absolute left-6 top-0 h-16 w-auto" />
+          <MascotImg kind="mochi" className="absolute right-6 top-0 h-16 w-auto" />
+        </>
+      ) : (
+        <MascotImg kind={kind} className={`absolute top-0 h-16 w-auto ${side === 'left' ? 'left-6' : 'right-6'}`} />
+      )}
+      <div className="relative">{children}</div>
+    </div>
+  )
+}

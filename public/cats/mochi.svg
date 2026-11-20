@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 220">
+  <!-- SEGNAPOSTO: sostituire con il PNG definitivo (vedi DESIGN_SYSTEM.md §4.5) -->
+  <path d="M30 220 C30 170 70 150 120 150 C170 150 210 170 210 220 Z" fill="#fffaf2" stroke="#43322a" stroke-width="3" stroke-linejoin="round"/>
+  <path d="M52 88 L48 22 L98 56 Z" fill="#fffaf2" stroke="#43322a" stroke-width="3" stroke-linejoin="round"/>
+  <path d="M188 88 L192 22 L142 56 Z" fill="#fffaf2" stroke="#43322a" stroke-width="3" stroke-linejoin="round"/>
+  <path d="M58 78 L56 38 L88 60 Z" fill="#f2b6bd"/>
+  <path d="M182 78 L184 38 L152 60 Z" fill="#f2b6bd"/>
+  <ellipse cx="120" cy="108" rx="82" ry="64" fill="#fffaf2" stroke="#43322a" stroke-width="3"/>
+  <path d="M64 70 q22 -20 40 -6 q-6 24 -34 22 Z" fill="#e8a15a"/><path d="M150 62 q24 4 30 30 q-26 8 -34 -14 Z" fill="#e8a15a"/>
+  <path d="M84 104 q12 -14 24 0" fill="none" stroke="#43322a" stroke-width="4" stroke-linecap="round"/>
+  <path d="M132 104 q12 -14 24 0" fill="none" stroke="#43322a" stroke-width="4" stroke-linecap="round"/>
+  <ellipse cx="76" cy="124" rx="11" ry="7" fill="#f2a1a8" opacity=".6"/>
+  <ellipse cx="164" cy="124" rx="11" ry="7" fill="#f2a1a8" opacity=".6"/>
+  <path d="M112 124 q4 6 8 0 q4 6 8 0" fill="none" stroke="#43322a" stroke-width="3" stroke-linecap="round"/>
+  <path d="M70 160 Q120 184 170 160" fill="none" stroke="#e8b4bc" stroke-width="12" stroke-linecap="round"/>
+  <circle cx="120" cy="178" r="9" fill="#e6bb78" stroke="#43322a" stroke-width="2.5"/>
+</svg>
