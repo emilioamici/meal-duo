@@ -1,11 +1,8 @@
 import type { ReactNode } from 'react'
 
 export type Mascot = 'zenitsu' | 'mochi' | 'pair'
-/**
- * TODO(asset): i file in public/cats sono SEGNAPOSTO in SVG. Sostituirli con i PNG definitivi
- * (stesso nome, estensione .png) e aggiornare FILE qui sotto — vedi DESIGN_SYSTEM.md §4.5.
- */
-const FILE: Record<Mascot, string> = { zenitsu: 'cats/zenitsu.svg', mochi: 'cats/mochi.svg', pair: 'cats/pair.svg' }
+/** Stessi PNG di Clean Duo e MoneyDuo (public/cats). */
+const FILE: Record<Mascot, string> = { zenitsu: 'cats/zenitsu.png', mochi: 'cats/mochi.png', pair: 'cats/pair.png' }
 
 export function MascotImg({ kind, className = '' }: { kind: Mascot; className?: string }) {
   return <img src={import.meta.env.BASE_URL + FILE[kind]} alt="" draggable={false} decoding="async" className={`pointer-events-none select-none ${className}`} />
