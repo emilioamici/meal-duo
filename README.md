@@ -81,7 +81,7 @@ src/
 ├─ components/                   ui, Chrome, Mascots, Sheets, Gate, ConnectSheet (flusso di collegamento), FolderPicker,
 │                                IdentityGuard, SyncCard,
 │                                NotificationsCard, Notifications …
-└─ views/                        TodayView, WeekView, ShoppingView, FamilyView
+└─ views/                        TodayView, WeekView, ShoppingView, SettingsView
 worker/                          Cloudflare Worker: broker OAuth (accesso persistente) + push (vedi worker/README.md)
 public/push-sw.js                gestori push/notificationclick caricati dal service worker di Workbox
 public/icons/ · public/cats/     icone PWA (da assets/icon-source.png) e mascotte (PNG condivisi con le altre app)
@@ -134,7 +134,11 @@ L'app non ha un backend: ogni utente accede con il proprio account Google e l'ap
 
 **Sessione scaduta.** Con una casa collegata, se la sessione Google non è più valida (e sei online) il Gate di riconnessione **copre tutta l'app** e i dati restano nascosti finché non accedi; l'app resta montata sotto, inerte, così quello che stavi scrivendo non si perde. Offline si resta sui dati locali.
 
-**Cartella del database.** Alla creazione della casa e poi da *Google Drive & Sync → Cartella del database → Sposta* (solo il proprietario) si sceglie dove sta il file: con il Picker attivo si usa il selettore di Google, altrimenti l'esplora-cartelle interno (cartelle del tuo Drive, «Nuova cartella qui»).
+**Cartella del database.** Alla creazione della casa e poi da *Sincronizzazione e account → Cartella del database → Sposta* (solo il proprietario) si sceglie dove sta il file: con il Picker attivo si usa il selettore di Google, altrimenti l'esplora-cartelle interno (cartelle del tuo Drive, «Nuova cartella qui»).
+
+### Impostazioni
+
+La quarta scheda della barra si chiama **Impostazioni** e ha la stessa struttura di Clean Duo (sezioni a scomparsa, con riepilogo da chiusa): **Aspetto** (sotto i due gattini: tema Mochi/Zenitsu/automatico con descrizione, e lingua), **Casa** (nome), **Membri della casa** (inviti), **Sincronizzazione e account**, **Notifiche**, **Catalogo alimenti** (con unione dei duplicati), **Piano alimentare (JSON)** e **Dati** (backup, ripristino, ricomincia da zero).
 
 ### Chi crea la casa (proprietario)
 1. **Accedi con Google** → l'app cerca un database `meal-duo-db.json` che l'account può vedere.
@@ -267,13 +271,9 @@ L'icona definitiva (i due gattini con le borse della spesa) è in `assets/icon-s
 
 ---
 
-### Impostazioni
-
-La quarta scheda della barra si chiama **Impostazioni** e ha la stessa struttura di Clean Duo (sezioni a scomparsa, con riepilogo da chiusa): **Aspetto** (sotto i due gattini: tema Mochi/Zenitsu/automatico con descrizione, e lingua), **Casa** (nome), **Membri della casa** (inviti), **Sincronizzazione e account**, **Notifiche**, **Catalogo alimenti** (con unione dei duplicati), **Piano alimentare (JSON)** e **Dati** (backup, ripristino, ricomincia da zero).
-
 ## 9. Test
 
-`npm test` esegue 150 test (Vitest) che coprono:
+`npm test` esegue 151 test (Vitest) che coprono:
 
 - **Motore della spesa:** somme tra membri/giorni, conversione kg→g e l→ml, unità incompatibili su righe separate, errori di virgola mobile, esclusione di membri e giorni (singoli e combinati), tombstone, immutabilità dell'input, spunte stabili al cambio filtri, «Nuova spesa», progresso.
 - **Fuzzy matching** (`pollo` → `Petto di pollo`, plurali, typo, alias, ambiguità) e unione dei duplicati con ridirezione delle voci dei piani.

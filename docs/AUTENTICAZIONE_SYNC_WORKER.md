@@ -304,7 +304,7 @@ Poi **Settings → Pages → Source: GitHub Actions** e rilancia il deploy.
 | Push (client) | `src/sync/push.ts`, `pushQueue.ts` |
 | Cache IndexedDB | `src/state/cache.ts` |
 | Store, notifiche, coda | `src/state/store.tsx`, `src/lib/notifications.ts` |
-| UI | `Gate`, `ConnectSheet` (flusso di collegamento), `FolderPicker`, `IdentityGuard`, `SyncCard`, `NotificationsCard`, `Notifications`, `Chrome` (pillola+campanella), `FamilyView` (membri/inviti), `App.tsx` (`Root`: Gate / overlay di riconnessione) |
+| UI | `Gate`, `ConnectSheet` (flusso di collegamento), `FolderPicker`, `IdentityGuard`, `SyncCard`, `NotificationsCard`, `Notifications`, `Chrome` (pillola+campanella), `SettingsView` (impostazioni: membri/inviti, catalogo, piano JSON), `App.tsx` (`Root`: Gate / overlay di riconnessione) |
 | Lingue | `src/i18n/{index,en,rich}.ts`, `src/lib/text.ts` |
 | Merge / DB | `src/services/merge.ts`, `dbOps.ts`, `dbSchema.ts` |
 | Service worker push | `public/push-sw.js`, `vite.config.ts` (`importScripts`) |
@@ -313,7 +313,7 @@ Poi **Settings → Pages → Source: GitHub Actions** e rilancia il deploy.
 
 ## 12. Cosa è stato verificato (e cosa no)
 
-**Verificato automaticamente (150 test):** merge (commutatività, idempotenza, tombstone), motore di sync con Drive simulato (push, merge bidirezionale, race GET→PATCH, sola lettura, offline, copia persa/datata, creazione/collegamento casa), notifiche, coda push, cifratura RFC 8291, VAPID, endpoint del Worker (subscribe/notify/auth), service worker push.
+**Verificato automaticamente (151 test):** merge (commutatività, idempotenza, tombstone), motore di sync con Drive simulato (push, merge bidirezionale, race GET→PATCH, sola lettura, offline, copia persa/datata, creazione/collegamento casa), notifiche, coda push, cifratura RFC 8291, VAPID, endpoint del Worker (subscribe/notify/auth), service worker push.
 
 **Verificato in browser (Playwright, due dispositivi, Drive e Worker simulati):** Anna parte dal **Gate** e accede con sessione persistente → crea la casa → invita Bruno (permesso `writer` su Drive) → Bruno accede, la casa viene trovata e collegata da sola, nessun membro duplicato → Bruno aggiunge una voce extra → viene scritta su Drive con l'autore, il Worker riceve la richiesta di push per Anna → Anna sincronizza e vede la notifica nella campanella → la sua sessione viene revocata: compare l'**overlay di riconnessione** → ritorno dal login col Worker (sessione nel frammento dell'URL) e l'app riprende. In un altro test: primo avvio in inglese → «Prova senza account» → nessuna parola italiana nell'interfaccia → cambio lingua immediato.
 

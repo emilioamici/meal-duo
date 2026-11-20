@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Download, FileUp } from 'lucide-react'
 import { Avatar, Sheet } from './ui'
 import { useStore } from '../state/store'
@@ -15,6 +15,8 @@ export function ImportSheet({ open, onClose, initialMemberId }: { open: boolean;
   const [text, setText] = useState('')
   const [memberId, setMemberId] = useState(initialMemberId)
   const file = useRef<HTMLInputElement>(null)
+  // il foglio resta montato: a ogni apertura riparte dal membro attualmente selezionato
+  useEffect(() => { if (open) setMemberId(initialMemberId) }, [open, initialMemberId])
 
   const target = members.find((m) => m.id === memberId) ?? members[0]
   const parsed = useMemo(() => (text.trim() ? parsePlanJson(text) : null), [text])

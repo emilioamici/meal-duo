@@ -11,7 +11,7 @@ const OPTIONS: Array<{ id: Theme; hint: string }> = [
 ]
 
 /** Scelta del tema (Mochi chiaro, Zenitsu scuro, automatico) e della lingua: stessa scheda di Clean Duo. */
-export function AppearanceCard() {
+export function AppearanceCard({ onChange }: { onChange?: () => void }) {
   useLang()
   const [theme, setT] = useState<Theme>(getTheme)
   const [langPref, setLang] = useState<LangPref>(getLangPref)
@@ -21,7 +21,7 @@ export function AppearanceCard() {
         {OPTIONS.map((o) => {
           const on = theme === o.id
           return (
-            <button key={o.id} type="button" role="radio" aria-checked={on} onClick={() => { setT(o.id); setTheme(o.id) }}
+            <button key={o.id} type="button" role="radio" aria-checked={on} onClick={() => { setT(o.id); setTheme(o.id); onChange?.() }}
               className={`flex w-full items-center gap-3 rounded-2xl border p-3 text-left transition active:scale-[0.98] ${on ? 'border-brand bg-brand/10' : 'border-line active:bg-line/30'}`}>
               {/* riquadri di anteprima: eccezione hex ammessa dal Design System (§0.2) */}
               <span className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-2xl" style={{ background: o.id === 'dark' ? '#16181d' : o.id === 'light' ? '#fff7ee' : 'linear-gradient(135deg,#fff7ee 50%,#16181d 50%)' }}>
@@ -39,7 +39,7 @@ export function AppearanceCard() {
       <p className="label">{t('Lingua')}</p>
       <div role="radiogroup" aria-label={t('Lingua')} className="flex gap-2">
         {(['auto', 'it', 'en'] as LangPref[]).map((id) => (
-          <button key={id} type="button" role="radio" aria-checked={langPref === id} onClick={() => { setLangPref(id); setLang(id) }}
+          <button key={id} type="button" role="radio" aria-checked={langPref === id} onClick={() => { setLangPref(id); setLang(id); onChange?.() }}
             className={`chip flex-1 justify-center ${langPref === id ? 'chip-active' : ''}`}>{id === 'auto' ? t('Automatico') : LANG_NAME[id]}</button>
         ))}
       </div>

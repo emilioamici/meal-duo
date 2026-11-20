@@ -24,8 +24,6 @@ import { isPristine } from '../services/dbOps'
 import { tb } from '../i18n/rich'
 import { t, tp } from '../i18n'
 
-const OPEN_KEY = 'mealduo:acc:'
-
 /** Campo che salva solo quando si esce (come in Clean Duo): niente scritture a ogni tasto. */
 function CommitInput({ value, onCommit, ...rest }: { value: string; onCommit: (v: string) => void } & Omit<React.InputHTMLAttributes<HTMLInputElement>, 'value' | 'onChange'>) {
   const [v, setV] = useState(value)
@@ -36,6 +34,7 @@ function CommitInput({ value, onCommit, ...rest }: { value: string; onCommit: (v
 /** Impostazioni: stessa struttura di Clean Duo (Aspetto sotto i gattini, poi Casa, Membri, Sincronizzazione, Notifiche, Dati). */
 export function SettingsView() {
   useLang()
+  const [, refresh] = useState(0) // il riepilogo di Aspetto legge tema e lingua dal dispositivo: si ridisegna a ogni cambio
   const { db, members, sync, prefs } = useStore()
   const { setMemberId } = useUi()
   const { commit } = useStore()
@@ -44,14 +43,13 @@ export function SettingsView() {
   const lp = getLangPref()
   const themeLabel = t(THEME_NAME[getTheme()])
   const syncSummary = !sync.fileId ? (isPristine(db) ? t('Modalità demo · dati solo su questo dispositivo') : t('Non collegato · dati solo su questo dispositivo')) : t('Collegato · {email}', { email: sync.email ?? '' })
-  void OPEN_KEY
   return (
     <>
       <PageHeader title={t('Impostazioni')} subtitle={t('Casa, membri e sincronizzazione')} right={<HeaderActions />} />
       <div className="space-y-3">
         <MascotPeek kind="pair">
           <Accordion id="look" title={t('Aspetto')} icon={<Palette size={20} />} summary={`${themeLabel} · ${lp === 'auto' ? t('Automatico') : LANG_NAME[lp]}`}>
-            <AppearanceCard />
+            <AppearanceCard onChange={() => refresh((n) => n + 1)} />
           </Accordion>
         </MascotPeek>
 
