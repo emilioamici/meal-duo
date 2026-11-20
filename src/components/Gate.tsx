@@ -22,7 +22,7 @@ export function Gate({ reconnect = false, onLocal }: { reconnect?: boolean; onLo
         <div className="glass-strong space-y-4 p-5">
           <ConnectFlow active reconnect={reconnect} allowLocal={!reconnect} onClose={onLocal ?? (() => undefined)} />
         </div>
-        <p className="mt-6 text-center text-xs text-muted">{t('I dati restano nel Drive del proprietario e in questo browser: nessun server di terze parti per i dati.')}</p>
+        <p className="mt-6 text-center text-xs text-muted">{t('I dati restano nel Drive del proprietario e in questo browser: nessun server di terze parti per i dati.')}{' '}<a className="font-semibold text-brand" href={import.meta.env.BASE_URL + 'privacy.html'}>{t('Informativa sulla privacy')}</a></p>
       </div>
       <div ref={setSheets} />
     </OverlayCtx.Provider>

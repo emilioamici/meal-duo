@@ -71,7 +71,7 @@ Il token di accesso di Google dura 1 ora, e un sito statico non può rinnovarlo 
 - Sul dispositivo resta un identificativo di sessione casuale (in `localStorage`): chi lo ottenesse potrebbe farsi dare token d'accesso dal Worker. Se sul tuo `<utente>.github.io` pubblichi anche altri siti, valuta un dominio dedicato.
 
 **1. Google Cloud Console**
-1. **Pubblica l'app.** Vai su *Google Auth Platform → Pubblico* (o *Schermata consenso OAuth*) e premi **Pubblica app** (stato *In produzione*). Se resta in *Testing*, Google fa scadere i token di rinnovo dopo **7 giorni**. In produzione senza verifica, Google mostra «app non verificata» al primo accesso: *Avanzate → Vai a Meal Duo*. Per uso personale va bene (limite di 100 utenti).
+1. **Pubblica l'app.** Vai su *Google Auth Platform → Pubblico* (o *Schermata consenso OAuth*) e premi **Pubblica app** (stato *In produzione*). Il pulsante resta grigio finché in *Branding* non compili nome dell'app, email di assistenza, home page (`https://<utente>.github.io/meal-duo/`) e informativa sulla privacy (`https://<utente>.github.io/meal-duo/privacy.html`, inclusa nell'app). Se resta in *Testing*, Google fa scadere i token di rinnovo dopo **7 giorni**. In produzione senza verifica, Google mostra «app non verificata» al primo accesso: *Avanzate → Vai a Meal Duo*. Per uso personale va bene (limite di 100 utenti).
 2. **Aggiungi l'URI di reindirizzamento.** In *Client → il tuo ID client OAuth → URI di reindirizzamento autorizzati* aggiungi l'indirizzo del Worker seguito da `/auth/callback`, per esempio `https://mealduo-push.tuo-nome.workers.dev/auth/callback`.
 3. **Copia il client secret** dalla stessa pagina del client. Non incollarlo in chat né nel repository: lo inserirai tra poco nel terminale.
 

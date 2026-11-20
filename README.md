@@ -103,6 +103,15 @@ L'app non ha un backend: ogni utente accede con il proprio account Google e l'ap
    - Nome app, email di assistenza, email sviluppatore.
    - **Ambiti (scope)**: aggiungi `https://www.googleapis.com/auth/drive.file` (è uno scope *non sensibile*: non richiede la verifica di Google).
    - **Utenti di prova**: finché l'app resta in stato «Test» aggiungi gli indirizzi Gmail di **tutti i familiari** (massimo 100). In alternativa premi «Pubblica app»: per `drive.file` non serve la verifica.
+   - **Branding** (obbligatorio per pubblicare: senza, il pulsante *Pubblica app* resta grigio con il messaggio «devi inserire le informazioni mancanti»). In *Google Auth Platform → Branding* compila:
+     - **Nome dell'app:** `Meal Duo`
+     - **Email di assistenza** e **email di contatto dello sviluppatore:** il tuo indirizzo
+     - **Home page dell'app:** `https://<utente>.github.io/<repo>/` (es. `https://emilioamici.github.io/meal-duo/`)
+     - **Norme sulla privacy:** `https://<utente>.github.io/<repo>/privacy.html` (la pagina è inclusa nell'app: `public/privacy.html`)
+     - *(facoltativi)* logo (puoi usare `assets/icon-source.png`) e condizioni di servizio.
+
+     Prima di salvare apri i due indirizzi dal browser: l'app deve essere già pubblicata su GitHub Pages (merge + deploy), altrimenti rispondono 404. Se Google chiede i **domini autorizzati**, `github.io` non è un dominio tuo e potrebbe essere rifiutato: in quel caso serve un dominio personalizzato per Pages (con lo scope `drive.file` non è richiesta la verifica dell'app, ma i link devono essere validi).
+     Poi, in *Pubblico*, premi **Pubblica app** (stato *In produzione*).
 4. **API e servizi → Credenziali → Crea credenziali → ID client OAuth**
    - Tipo di applicazione: **Applicazione web**.
    - **Origini JavaScript autorizzate** (solo schema + dominio, **senza percorso**):
