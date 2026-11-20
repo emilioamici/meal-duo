@@ -442,8 +442,8 @@ export class SyncEngine {
       return this.set('auth', t('Sessione Google scaduta: riconnettiti per continuare a sincronizzare.'))
     }
     if (e instanceof DriveError) {
-      if (e.status === 404 && pickerConfigured()) return this.set('error', t('Non riesco ad aprire il database: scegli di nuovo il file con il selettore di Google (Famiglia → Sincronizzazione). Se non lo vedi, forse sei stato rimosso dalla casa o il file è stato spostato.'))
-      if (e.status === 404) return this.set('error', t('Non hai più accesso al database: forse sei stato rimosso dalla casa o il file è stato spostato. Puoi scollegarti dalla scheda Famiglia.'))
+      if (e.status === 404 && pickerConfigured()) return this.set('error', t('Non riesco ad aprire il database: scegli di nuovo il file con il selettore di Google (Impostazioni → Sincronizzazione e account). Se non lo vedi, forse sei stato rimosso dalla casa o il file è stato spostato.'))
+      if (e.status === 404) return this.set('error', t('Non hai più accesso al database: forse sei stato rimosso dalla casa o il file è stato spostato. Puoi scollegarti dalle Impostazioni.'))
       if (e.status === 403) return this.set('error', t('Permesso negato: serve l\'accesso in modifica al file.') + ' ' + e.message)
       return this.set('error', t('Errore Google Drive ({status}): {message}', { status: e.status, message: e.message }))
     }

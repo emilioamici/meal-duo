@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, t
 import type { DayIndex, ShoppingFilters } from '../types'
 import { todayIndex } from '../lib/ids'
 
-export type Tab = 'today' | 'week' | 'shop' | 'family'
+export type Tab = 'today' | 'week' | 'shop' | 'settings'
 
 export interface CelebrationEvent { key: number; x: number; y: number; label: string }
 

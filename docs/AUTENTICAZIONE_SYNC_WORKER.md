@@ -128,7 +128,7 @@ La cache scrive in IndexedDB (con ripiego su `localStorage`), con debounce 300 m
 ## 5. Condivisione del database tra i membri
 
 ### 5.1 Il proprietario
-Al primo avvio il **Gate** (oppure, in modalità demo, `Famiglia → Google Drive & Sync → Collega Google Drive`) esegue il flusso `ConnectFlow`:
+Al primo avvio il **Gate** (oppure, in modalità demo, `Impostazioni → Sincronizzazione e account → Collega Google Drive`) esegue il flusso `ConnectFlow`:
 1. **Accedi con Google** (popup o broker).
 2. `listCandidates()` cerca file con `properties mealduo=db` o nome `meal-duo…` accessibili all'app.
 3. Nessuno trovato → **Crea casa**: `engine.createHouse()` crea il file (`createFile`, multipart, `writersCanShare:false`) con un DB nuovo che contiene il proprietario (con la sua email) — oppure con i dati già presenti se si sceglie «Porta con me i dati».
@@ -176,7 +176,7 @@ La coda viene svuotata **solo dopo che i dati sono arrivati su Drive** (`afterSy
 Le chiamate cross-origin (Google) non vengono mai intercettate né messe in cache.
 
 ### 6.5 Attivazione sul dispositivo
-`Famiglia → Notifiche → Attiva notifiche`: richiede il permesso, `registration.pushManager.subscribe` con la chiave VAPID pubblica e `POST /subscribe {fileId, subscription}` (autenticato col token Google). Ogni apertura rinnova l'iscrizione (`refreshPush`). Pulsante «Invia una notifica di prova». **iPhone:** iOS 16.4+ e app aggiunta alla Home.
+`Impostazioni → Notifiche → Attiva notifiche`: richiede il permesso, `registration.pushManager.subscribe` con la chiave VAPID pubblica e `POST /subscribe {fileId, subscription}` (autenticato col token Google). Ogni apertura rinnova l'iscrizione (`refreshPush`). Pulsante «Invia una notifica di prova». **iPhone:** iOS 16.4+ e app aggiunta alla Home.
 
 ---
 
@@ -219,7 +219,7 @@ Le chiamate cross-origin (Google) non vengono mai intercettate né messe in cach
    - Origini JS autorizzate: `http://localhost:5173`, `https://<utente>.github.io` (solo schema+dominio).
    - **URI di reindirizzamento** (solo con il Worker): `https://<worker>.workers.dev/auth/callback`.
    - Copia **Client ID** e (per il Worker) **client secret** (mai in chat né nel repo).
-4. *(Picker)* **Chiave API** limitata a Picker API; **App ID** = numero del progetto.
+4. *(Picker)* **Chiave API**: *Restrizioni delle API* → solo **Google Picker API**; *Restrizioni delle applicazioni → Siti web* → `https://<utente>.github.io/*` (**origine senza percorso**: il Picker gira in un iframe di Google e il browser invia solo l'origine; con `…/meal-duo/*` si ottiene «The API developer key is invalid»). **App ID** = numero del progetto.
 
 ### 8.2 Worker (una volta sola)
 ```bash
@@ -248,9 +248,9 @@ npx wrangler deploy                           # poi apri <url>/health → {"ok":
 Poi **Settings → Pages → Source: GitHub Actions** e rilancia il deploy.
 
 ### 8.4 Sui dispositivi
-1. Apri l'app → *Famiglia → Collega Google Drive* → accedi. (Con il Worker: «Attiva l'accesso persistente» se già dentro.)
+1. Apri l'app → *Impostazioni → Sincronizzazione e account → Collega Google Drive* → accedi. (Con il Worker: «Attiva l'accesso persistente» se già dentro.)
 2. Proprietario: *Crea casa* → *Invita con Google Drive*. Gli altri: accedono e scelgono il database (Picker).
-3. *Famiglia → Notifiche → Attiva notifiche* su ogni telefono; «Invia una notifica di prova».
+3. *Impostazioni → Notifiche → Attiva notifiche* su ogni telefono; «Invia una notifica di prova».
 
 ---
 
@@ -263,6 +263,7 @@ Poi **Settings → Pages → Source: GitHub Actions** e rilancia il deploy.
 | «Google non ha rilasciato il token di rinnovo» | app già autorizzata: rimuovi l'accesso su myaccount.google.com/permissions e riprova |
 | Dopo 7 giorni chiede di nuovo l'accesso | app ancora in *Testing*: pubblicala |
 | «Origine non autorizzata» (403) | `ALLOWED_ORIGINS` deve essere l'origine esatta (`https://utente.github.io`, senza percorso) |
+| «The API developer key is invalid» nel Picker | restrizione della chiave con percorso: usa `https://<utente>.github.io/*`; controlla anche che Picker API sia abilitata e inclusa nelle restrizioni della chiave |
 | `404` aprendo il database (secondo membro) | con `drive.file` serve il **Picker**; oppure il file è stato spostato/non più condiviso |
 | «Permesso negato: serve l'accesso in modifica» | il proprietario deve dare il ruolo Editor |
 | La prova push non arriva | permesso notifiche bloccato per il sito; l'app deve essere in background (in primo piano compare la campanella). Log: `npx wrangler tail` |
@@ -303,7 +304,7 @@ Poi **Settings → Pages → Source: GitHub Actions** e rilancia il deploy.
 | Push (client) | `src/sync/push.ts`, `pushQueue.ts` |
 | Cache IndexedDB | `src/state/cache.ts` |
 | Store, notifiche, coda | `src/state/store.tsx`, `src/lib/notifications.ts` |
-| UI | `Gate`, `ConnectSheet` (flusso di collegamento), `FolderPicker`, `IdentityGuard`, `SyncCard`, `NotificationsCard`, `Notifications`, `Chrome` (pillola+campanella), `FamilyView` (membri/inviti), `App.tsx` (`Root`: Gate / overlay di riconnessione) |
+| UI | `Gate`, `ConnectSheet` (flusso di collegamento), `FolderPicker`, `IdentityGuard`, `SyncCard`, `NotificationsCard`, `Notifications`, `Chrome` (pillola+campanella), `SettingsView` (impostazioni: membri/inviti, catalogo, piano JSON), `App.tsx` (`Root`: Gate / overlay di riconnessione) |
 | Lingue | `src/i18n/{index,en,rich}.ts`, `src/lib/text.ts` |
 | Merge / DB | `src/services/merge.ts`, `dbOps.ts`, `dbSchema.ts` |
 | Service worker push | `public/push-sw.js`, `vite.config.ts` (`importScripts`) |
@@ -312,7 +313,7 @@ Poi **Settings → Pages → Source: GitHub Actions** e rilancia il deploy.
 
 ## 12. Cosa è stato verificato (e cosa no)
 
-**Verificato automaticamente (150 test):** merge (commutatività, idempotenza, tombstone), motore di sync con Drive simulato (push, merge bidirezionale, race GET→PATCH, sola lettura, offline, copia persa/datata, creazione/collegamento casa), notifiche, coda push, cifratura RFC 8291, VAPID, endpoint del Worker (subscribe/notify/auth), service worker push.
+**Verificato automaticamente (151 test):** merge (commutatività, idempotenza, tombstone), motore di sync con Drive simulato (push, merge bidirezionale, race GET→PATCH, sola lettura, offline, copia persa/datata, creazione/collegamento casa), notifiche, coda push, cifratura RFC 8291, VAPID, endpoint del Worker (subscribe/notify/auth), service worker push.
 
 **Verificato in browser (Playwright, due dispositivi, Drive e Worker simulati):** Anna parte dal **Gate** e accede con sessione persistente → crea la casa → invita Bruno (permesso `writer` su Drive) → Bruno accede, la casa viene trovata e collegata da sola, nessun membro duplicato → Bruno aggiunge una voce extra → viene scritta su Drive con l'autore, il Worker riceve la richiesta di push per Anna → Anna sincronizza e vede la notifica nella campanella → la sua sessione viene revocata: compare l'**overlay di riconnessione** → ritorno dal login col Worker (sessione nel frammento dell'URL) e l'app riprende. In un altro test: primo avvio in inglese → «Prova senza account» → nessuna parola italiana nell'interfaccia → cambio lingua immediato.
 

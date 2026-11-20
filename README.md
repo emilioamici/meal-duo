@@ -11,7 +11,7 @@
 
 > **Primo avvio:** come in MoneyDuo si parte dal **Gate** (accesso con Google → la casa viene trovata o creata). Chi vuole solo provare l'app può toccare **«Prova senza account»**: contiene i dati di esempio di due persone (Emilio e Sara) e funziona subito, senza login Google.
 >
-> **Lingue:** italiano e inglese (automatico dal dispositivo, cambiabile da Famiglia → Aspetto).
+> **Lingue:** italiano e inglese (automatico dal dispositivo, cambiabile da Impostazioni → Aspetto).
 
 ---
 
@@ -52,7 +52,7 @@ Variabili opzionali (vedi `.env.example`), utili per non reinserire i valori ad 
 | `VITE_GOOGLE_API_KEY` | API Key, solo per il Google Picker |
 | `VITE_GOOGLE_APP_ID` | Numero del progetto Cloud, solo per il Google Picker |
 
-In alternativa si inseriscono dall'app: **Famiglia → Google Drive & Sync**.
+In alternativa si inseriscono dall'app: **Impostazioni → Sincronizzazione e account**.
 
 ---
 
@@ -81,7 +81,7 @@ src/
 ├─ components/                   ui, Chrome, Mascots, Sheets, Gate, ConnectSheet (flusso di collegamento), FolderPicker,
 │                                IdentityGuard, SyncCard,
 │                                NotificationsCard, Notifications …
-└─ views/                        TodayView, WeekView, ShoppingView, FamilyView
+└─ views/                        TodayView, WeekView, ShoppingView, SettingsView
 worker/                          Cloudflare Worker: broker OAuth (accesso persistente) + push (vedi worker/README.md)
 public/push-sw.js                gestori push/notificationclick caricati dal service worker di Workbox
 public/icons/ · public/cats/     icone PWA (da assets/icon-source.png) e mascotte (PNG condivisi con le altre app)
@@ -120,9 +120,9 @@ L'app non ha un backend: ogni utente accede con il proprio account Google e l'ap
    - **URI di reindirizzamento**: non servono (si usa il token client GIS con popup).
    - Copia il **Client ID** (`123456-abc.apps.googleusercontent.com`).
 5. *(Facoltativo, solo per «Scegli da Drive»)*
-   - **Credenziali → Crea credenziali → Chiave API**, limitala a *Google Picker API* e alle origini HTTP sopra.
+   - **Credenziali → Crea credenziali → Chiave API**: in *Restrizioni delle API* limitala a **Google Picker API**; in *Restrizioni delle applicazioni → Siti web* usa l'**origine senza percorso**: `https://<utente>.github.io/*` (e `http://localhost:5173/*`). Il Picker gira in un iframe di Google e i browser inviano ai siti di terzi solo l'origine: con un percorso (`…/meal-duo/*`) la chiave viene rifiutata con «The API developer key is invalid».
    - **App ID** = *numero del progetto* (Dashboard del progetto → «Numero progetto»).
-6. In Meal Duo apri **Famiglia → Google Drive & Sync**, incolla il Client ID (ed eventualmente API Key e App ID) e premi **Accedi con Google**.
+6. In Meal Duo apri **Impostazioni → Sincronizzazione e account**, incolla il Client ID (ed eventualmente API Key e App ID) e premi **Accedi con Google**.
 
 > Lo scope `drive.file` dà accesso **solo** ai file creati dall'app o che l'utente le ha aperto esplicitamente: Meal Duo non può leggere nient'altro del tuo Drive.
 
@@ -130,16 +130,20 @@ L'app non ha un backend: ogni utente accede con il proprio account Google e l'ap
 
 ## 4. Accesso, condivisione e inviti
 
-**Gate.** Senza una casa collegata l'app mostra a schermo intero la schermata di accesso (come MoneyDuo): **Accedi con Google** → l'app cerca il database e lo collega, oppure propone di crearlo. «Prova senza account (dati demo)» è l'unica uscita: l'app resta in locale e la casa si può collegare in seguito da **Famiglia → Google Drive & Sync** (o dalla pillola «Locale»).
+**Gate.** Senza una casa collegata l'app mostra a schermo intero la schermata di accesso (come MoneyDuo): **Accedi con Google** → l'app cerca il database e lo collega, oppure propone di crearlo. «Prova senza account (dati demo)» è l'unica uscita: l'app resta in locale e la casa si può collegare in seguito da **Impostazioni → Sincronizzazione e account** (o dalla pillola «Locale»).
 
 **Sessione scaduta.** Con una casa collegata, se la sessione Google non è più valida (e sei online) il Gate di riconnessione **copre tutta l'app** e i dati restano nascosti finché non accedi; l'app resta montata sotto, inerte, così quello che stavi scrivendo non si perde. Offline si resta sui dati locali.
 
-**Cartella del database.** Alla creazione della casa e poi da *Google Drive & Sync → Cartella del database → Sposta* (solo il proprietario) si sceglie dove sta il file: con il Picker attivo si usa il selettore di Google, altrimenti l'esplora-cartelle interno (cartelle del tuo Drive, «Nuova cartella qui»).
+**Cartella del database.** Alla creazione della casa e poi da *Sincronizzazione e account → Cartella del database → Sposta* (solo il proprietario) si sceglie dove sta il file: con il Picker attivo si usa il selettore di Google, altrimenti l'esplora-cartelle interno (cartelle del tuo Drive, «Nuova cartella qui»).
+
+### Impostazioni
+
+La quarta scheda della barra si chiama **Impostazioni** e ha la stessa struttura di Clean Duo (sezioni a scomparsa, con riepilogo da chiusa): **Aspetto** (sotto i due gattini: tema Mochi/Zenitsu/automatico con descrizione, e lingua), **Casa** (nome), **Membri della casa** (inviti), **Sincronizzazione e account**, **Notifiche**, **Catalogo alimenti** (con unione dei duplicati), **Piano alimentare (JSON)** e **Dati** (backup, ripristino, ricomincia da zero).
 
 ### Chi crea la casa (proprietario)
 1. **Accedi con Google** → l'app cerca un database `meal-duo-db.json` che l'account può vedere.
 2. Se non c'è: **Crea casa** (nome della casa, il tuo nome, cartella di Drive se il Picker è attivo). Il file ha il marcatore pubblico `properties.mealduo=db` e `writersCanShare=false`: **solo il proprietario può invitare o rimuovere persone**.
-3. **Famiglia → Membri → Invita con Google Drive**: inserisci l'email del familiare (e se è una persona già presente nel piano, collegala a quel membro). L'app concede il ruolo **Editor** sul file via Drive API e Drive manda l'email di invito.
+3. **Impostazioni → Membri della casa → Invita con Google Drive**: inserisci l'email del familiare (e se è una persona già presente nel piano, collegala a quel membro). L'app concede il ruolo **Editor** sul file via Drive API e Drive manda l'email di invito.
 
 ### Chi si unisce
 1. Apre l'app → **Collega Google Drive** → accede con *il proprio* account Google.
@@ -192,13 +196,13 @@ Installazione passo passo: **`worker/README.md`**. In breve: `node worker/script
 | Articoli spuntati (chi fa la spesa si vede) | «Sara ha preso Latte» · oltre 3: «Sara ha spuntato 5 articoli» |
 | Modifica del **tuo** piano da parte di un altro | «Emilio ha modificato il tuo piano · Martedì» |
 
-Ogni notifica compare nella **campanella** dell'app (anche senza Worker, ricevuta alla sync), come avviso del telefono se l'app è in background e, con il Worker, come push ad app chiusa. Le notifiche push partono **dopo** che i dati sono arrivati su Drive (coda locale che sopravvive a offline e riavvii, scarto dopo 24 h o se la voce è stata eliminata); le spunte dello stesso autore **sostituiscono** la precedente (stesso `tag`). Si attivano da **Famiglia → Notifiche**. Su iPhone servono iOS 16.4+ e l'app aggiunta alla Home.
+Ogni notifica compare nella **campanella** dell'app (anche senza Worker, ricevuta alla sync), come avviso del telefono se l'app è in background e, con il Worker, come push ad app chiusa. Le notifiche push partono **dopo** che i dati sono arrivati su Drive (coda locale che sopravvive a offline e riavvii, scarto dopo 24 h o se la voce è stata eliminata); le spunte dello stesso autore **sostituiscono** la precedente (stesso `tag`). Si attivano da **Impostazioni → Notifiche**. Su iPhone servono iOS 16.4+ e l'app aggiunta alla Home.
 
 ---
 
 ## 6. Import / export del piano in JSON
 
-Nella schermata **Settimana → Piano in JSON**:
+Dalla schermata **Settimana → Piano in JSON** oppure da **Impostazioni → Piano alimentare (JSON)**:
 
 | Azione | Cosa fa |
 |---|---|
@@ -234,7 +238,7 @@ Formato (`meal-duo-plan` v1):
 - `days` può essere un array (`day`: «Lunedì», «lun», «monday»…) oppure un oggetto indicizzato per nome del giorno. I giorni mancanti restano vuoti.
 - `quantity`: numero > 0 (accetta anche `"1,5"`). `unit`: `g`, `kg`, `ml`, `l`, `pz`, `cucchiaio`… (se manca → `g` con avviso).
 - Gli errori indicano il percorso preciso (`days[2].meals[1].items[0]: …`).
-- **Normalizzazione dei nomi:** l'import associa i nomi al catalogo solo quando la corrispondenza è inequivocabile (stesso nome, plurale/singolare, ordine delle parole, alias, typo di 1 lettera, o un solo alimento che contiene tutte le parole). «Pollo» con due alimenti «Petto di pollo» e «Cosce di pollo» è ambiguo → viene creato come nuovo; l'anteprima mostra sempre cosa verrà associato o creato, e **Famiglia → Catalogo** permette di unire i duplicati in un secondo momento.
+- **Normalizzazione dei nomi:** l'import associa i nomi al catalogo solo quando la corrispondenza è inequivocabile (stesso nome, plurale/singolare, ordine delle parole, alias, typo di 1 lettera, o un solo alimento che contiene tutte le parole). «Pollo» con due alimenti «Petto di pollo» e «Cosce di pollo» è ambiguo → viene creato come nuovo; l'anteprima mostra sempre cosa verrà associato o creato, e **Impostazioni → Catalogo alimenti** permette di unire i duplicati in un secondo momento.
 
 ---
 
@@ -269,7 +273,7 @@ L'icona definitiva (i due gattini con le borse della spesa) è in `assets/icon-s
 
 ## 9. Test
 
-`npm test` esegue 150 test (Vitest) che coprono:
+`npm test` esegue 151 test (Vitest) che coprono:
 
 - **Motore della spesa:** somme tra membri/giorni, conversione kg→g e l→ml, unità incompatibili su righe separate, errori di virgola mobile, esclusione di membri e giorni (singoli e combinati), tombstone, immutabilità dell'input, spunte stabili al cambio filtri, «Nuova spesa», progresso.
 - **Fuzzy matching** (`pollo` → `Petto di pollo`, plurali, typo, alias, ambiguità) e unione dei duplicati con ridirezione delle voci dei piani.
@@ -286,7 +290,7 @@ L'icona definitiva (i due gattini con le borse della spesa) è in `assets/icon-s
 
 ## 9b. Lingue (it / en)
 
-I testi sono in italiano nel codice: `t('Testo italiano {nome}', { nome })` restituisce il testo nella lingua in uso; in inglese lo cerca in `src/i18n/en.ts` (la chiave è il testo italiano) e, se manca, ripiega sull'italiano. `tb()` accetta `<b>` e `<code>`, `tp(n, singolare, plurale)` gestisce i plurali, `dayShort/dayLong` i giorni, `locale()` date e numeri. Lingua: *Automatico* (segue il browser: italiano se `it`, altrimenti inglese), *Italiano*, *English* — da **Famiglia → Aspetto**; si applica subito, senza ricaricare.
+I testi sono in italiano nel codice: `t('Testo italiano {nome}', { nome })` restituisce il testo nella lingua in uso; in inglese lo cerca in `src/i18n/en.ts` (la chiave è il testo italiano) e, se manca, ripiega sull'italiano. `tb()` accetta `<b>` e `<code>`, `tp(n, singolare, plurale)` gestisce i plurali, `dayShort/dayLong` i giorni, `locale()` date e numeri. Lingua: *Automatico* (segue il browser: italiano se `it`, altrimenti inglese), *Italiano*, *English* — da **Impostazioni → Aspetto**; si applica subito, senza ricaricare.
 
 **Aggiungere un testo:** scrivilo con `t('…')` e aggiungi la voce in `en.ts`; `npm test` fallisce se manca la traduzione, se i segnaposto non coincidono o se resta testo JSX fuori da `t()`.
 **Non si traducono i dati dell'utente:** nomi di alimenti e pasti, nomi dei membri e della casa, e il formato JSON del piano (giorni in italiano; l'import accetta anche i nomi inglesi). Le notifiche push sono scritte nella lingua di chi fa la modifica.
@@ -325,7 +329,7 @@ Verificata con Playwright (iPhone 14, tema chiaro e scuro) e ispezione del codic
 - [x] Cornice telefono `max-w-md` + `rounded-[2.75rem]` su desktop
 - [x] Fogli chiudibili con Esc, scrim e trascinamento dalla maniglia (120 px / 600)
 - [x] Feedback al tocco su tutti gli elementi tappabili; aree ≥ 40 px
-- [x] Mascotte: `alt=""`, `draggable={false}`, un solo capolino per schermata, destra Mochi / sinistra Zenitsu, coppia in Famiglia
+- [x] Mascotte: `alt=""`, `draggable={false}`, un solo capolino per schermata, destra Mochi / sinistra Zenitsu, coppia in Impostazioni
 
 ## 12. Limiti noti
 

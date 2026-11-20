@@ -6,7 +6,7 @@ import { UiProvider, useUi } from './state/ui'
 import { TodayView } from './views/TodayView'
 import { WeekView } from './views/WeekView'
 import { ShoppingView } from './views/ShoppingView'
-import { FamilyView } from './views/FamilyView'
+import { SettingsView } from './views/SettingsView'
 import { OverlayCtx } from './state/overlay'
 import { ConnectSheet } from './components/ConnectSheet'
 import { IdentityGuard } from './components/IdentityGuard'
@@ -45,7 +45,7 @@ function AppShell() {
                 {tab === 'today' && <TodayView />}
                 {tab === 'week' && <WeekView />}
                 {tab === 'shop' && <ShoppingView />}
-                {tab === 'family' && <FamilyView />}
+                {tab === 'settings' && <SettingsView />}
               </motion.div>
             </AnimatePresence>
           </div>

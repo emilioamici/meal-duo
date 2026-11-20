@@ -37,8 +37,18 @@ describe('traduzioni in inglese', () => {
   })
   it('categorie degli alimenti, etichette delle tab e stati sync (testi dinamici) tradotti', async () => {
     const { FOOD_CATEGORIES } = await import('../lib/foodMatch')
-    const dyn = [...FOOD_CATEGORIES, 'Oggi', 'Settimana', 'Spesa', 'Famiglia', 'Locale', 'Da inviare', 'Sync…', 'Sincronizzato', 'Offline', 'Errore', 'Accedi', 'Non collegato', 'Riconnessione necessaria', 'Da sincronizzare', 'Sincronizzazione…']
+    const dyn = [...FOOD_CATEGORIES, 'Oggi', 'Settimana', 'Spesa', 'Impostazioni', 'Mochi (Chiaro)', 'Zenitsu (Scuro)', 'Locale', 'Da inviare', 'Sync…', 'Sincronizzato', 'Offline', 'Errore', 'Accedi', 'Non collegato', 'Riconnessione necessaria', 'Da sincronizzare', 'Sincronizzazione…']
     expect(dyn.filter((k) => !(k in EN))).toEqual([])
+  })
+  it('nessuna voce inglese orfana (non usata nel codice né tra i testi dinamici)', async () => {
+    const { FOOD_CATEGORIES } = await import('../lib/foodMatch')
+    const dynamic = new Set([...FOOD_CATEGORIES, 'Oggi', 'Settimana', 'Spesa', 'Impostazioni', 'Mochi (Chiaro)', 'Zenitsu (Scuro)', 'Automatico', 'Locale', 'Da inviare', 'Sync…', 'Sincronizzato', 'Offline', 'Errore', 'Accedi', 'Non collegato', 'Riconnessione necessaria', 'Da sincronizzare', 'Sincronizzazione…', 'Spuntino serale', 'Pre-workout', 'Post-workout',
+      // scelte con un ternario dentro t(cond ? 'a' : 'b'): la regex non le vede come letterali
+      'Sincronizzazione: {s}. Tocca per collegare Google Drive', 'Sincronizzazione: {s}. Tocca per sincronizzare', '{name}: da comprare', '{name}: preso', '{n} usi', '{n} uso',
+      // descrizioni dei temi (array di oggetti letti con t(o.hint))
+      'Chiara, crema e arancio come il gatto bianco e arancione', 'Scura, ardesia come il gatto grigio scuro', 'Segue la modalità del telefono'])
+    const used = new Set(usedKeys())
+    expect(Object.keys(EN).filter((k) => !used.has(k) && !dynamic.has(k))).toEqual([])
   })
   it('segnaposto e tag (<b>, <code>) coincidono con l\'originale', () => {
     const bad = Object.entries(EN).filter(([k, v]) => placeholders(k) !== placeholders(v) || tags(k) !== tags(v)).map(([k]) => k)

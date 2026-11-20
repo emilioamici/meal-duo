@@ -135,7 +135,7 @@ export function ConnectFlow({ active, reconnect = false, onClose, allowLocal = f
 
           <div className="mt-3 space-y-1 rounded-2xl border border-line bg-bg/60 p-3">
             <p className="flex items-center gap-2 text-sm font-semibold"><Users size={16} className="text-brand" />{t('Crea la tua casa')}</p>
-            <p className="text-xs text-muted">{t('Il database sarà un file nel tuo Drive: tu sei il proprietario e inviti gli altri dalla scheda Famiglia.')}</p>
+            <p className="text-xs text-muted">{t('Il database sarà un file nel tuo Drive: tu sei il proprietario e inviti gli altri dalle Impostazioni.')}</p>
             <label className="label">{t('Nome della casa')}</label>
             <input className="field" value={houseName} onChange={(e) => setHouseName(e.target.value)} />
             <label className="label">{t('Il tuo nome')}</label>
@@ -202,7 +202,7 @@ function FileList({ files, busy, onPick }: { files: DriveFile[]; busy: boolean; 
   )
 }
 
-/** Foglio per collegare Google Drive quando si usa l'app in locale (dalla scheda Famiglia o dalla pillola «Locale»). */
+/** Foglio per collegare Google Drive quando si usa l'app in locale (dalle Impostazioni o dalla pillola «Locale»). */
 export function ConnectSheet() {
   const { connectOpen, setConnectOpen } = useUi()
   return (

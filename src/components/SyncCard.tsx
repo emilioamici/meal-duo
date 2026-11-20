@@ -96,7 +96,7 @@ export function SyncCard() {
             </button>
           )}
           {picking && <FolderPicker title={t('Sposta il database')} onClose={() => setPicking(false)} onPick={(f) => { setPicking(false); void move(f.id, f.id === 'root' ? t('Il mio Drive') : f.name) }} />}
-          <p className="mt-1.5 px-1 text-xs text-muted">{sync.canShare ? t('Sei il proprietario: invita i familiari dalla scheda Membri.') : t('Proprietario: {email}.', { email: sync.ownerEmail ?? t('altro account') })}</p>
+          <p className="mt-1.5 px-1 text-xs text-muted">{sync.canShare ? t('Sei il proprietario: invita i familiari da «Membri della casa».') : t('Proprietario: {email}.', { email: sync.ownerEmail ?? t('altro account') })}</p>
           <div className="mt-4 grid grid-cols-3 gap-2 border-t border-line/70 pt-3">
             <button className="glass-btn !px-2 !text-xs" disabled={busy} onClick={() => run(() => engine.signIn({ selectAccount: true }))}><UserRound size={15} />{t('Account')}</button>
             <ConfirmButton className="!px-2 !text-xs" label={<><Unplug size={15} />{t('Scollega')}</>} confirmLabel={t('Conferma')} onConfirm={() => engine.unlink()} />

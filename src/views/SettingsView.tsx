@@ -1,8 +1,8 @@
-import { useMemo, useRef, useState } from 'react'
-import { Bell, Check, Cloud, Database, Mail, Palette, Pencil, Plus, Search, Trash2, Users, Utensils } from 'lucide-react'
-import { Accordion, Avatar, ConfirmButton, PageHeader, Segmented, Sheet } from '../components/ui'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { Bell, Check, Cloud, Database, FileJson, Home, Mail, Palette, Pencil, Plus, Search, ShieldCheck, Trash2, UserRound, Utensils } from 'lucide-react'
+import { Accordion, Avatar, ConfirmButton, PageHeader, Sheet } from '../components/ui'
 import { HeaderActions } from '../components/Chrome'
-import { MascotImg, MascotPeek } from '../components/Mascots'
+import { MascotPeek } from '../components/Mascots'
 import { useStore } from '../state/store'
 import { useUi } from '../state/ui'
 import type { FoodCatalogItem, Member } from '../types'
@@ -11,8 +11,12 @@ import { parseDb } from '../services/dbSchema'
 import { findDuplicatePairs, FOOD_CATEGORIES, normalizeName, searchFoods } from '../lib/foodMatch'
 import { COMMON_UNITS } from '../lib/units'
 import { downloadJson, readFileText } from '../lib/files'
-import { getTheme, setTheme, type Theme } from '../lib/theme'
-import { LANG_NAME, getLangPref, setLangPref, useLang, type LangPref } from '../i18n'
+import { THEME_NAME, getTheme } from '../lib/theme'
+import { AppearanceCard } from '../components/AppearanceCard'
+import { MemberPills } from '../components/MemberPills'
+import { PlanJsonCard } from '../components/PlanJsonCard'
+import { useActiveMember } from '../state/hooks'
+import { LANG_NAME, getLangPref, useLang } from '../i18n'
 import { SyncCard } from '../components/SyncCard'
 import { NotificationsCard } from '../components/NotificationsCard'
 import { engine } from '../sync/engine'
@@ -20,42 +24,74 @@ import { isPristine } from '../services/dbOps'
 import { tb } from '../i18n/rich'
 import { t, tp } from '../i18n'
 
-export function FamilyView() {
+/** Campo che salva solo quando si esce (come in Clean Duo): niente scritture a ogni tasto. */
+function CommitInput({ value, onCommit, ...rest }: { value: string; onCommit: (v: string) => void } & Omit<React.InputHTMLAttributes<HTMLInputElement>, 'value' | 'onChange'>) {
+  const [v, setV] = useState(value)
+  useEffect(() => setV(value), [value])
+  return <input {...rest} className="field" value={v} onChange={(e) => setV(e.target.value)} onBlur={() => v !== value && onCommit(v)} onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()} />
+}
+
+/** Impostazioni: stessa struttura di Clean Duo (Aspetto sotto i gattini, poi Casa, Membri, Sincronizzazione, Notifiche, Dati). */
+export function SettingsView() {
+  useLang()
+  const [, refresh] = useState(0) // il riepilogo di Aspetto legge tema e lingua dal dispositivo: si ridisegna a ogni cambio
   const { db, members, sync, prefs } = useStore()
+  const { setMemberId } = useUi()
+  const { commit } = useStore()
+  const member = useActiveMember()
   const foods = liveFoods(db)
+  const lp = getLangPref()
+  const themeLabel = t(THEME_NAME[getTheme()])
+  const syncSummary = !sync.fileId ? (isPristine(db) ? t('Modalità demo · dati solo su questo dispositivo') : t('Non collegato · dati solo su questo dispositivo')) : t('Collegato · {email}', { email: sync.email ?? '' })
   return (
     <>
-      <PageHeader title={t('Famiglia')} subtitle={db.houseName} right={<HeaderActions />} />
-      <MascotPeek kind="pair">
-        <div className="space-y-3">
-          <Accordion id="sync" title={t('Google Drive & Sync')} icon={<Cloud size={22} />} defaultOpen
-            summary={!sync.fileId ? (isPristine(db) ? t('Modalità demo · dati solo su questo dispositivo') : t('Non collegato · dati solo su questo dispositivo')) : t('Collegato · {email}', { email: sync.email ?? '' })}>
-            <SyncCard />
+      <PageHeader title={t('Impostazioni')} subtitle={t('Casa, membri e sincronizzazione')} right={<HeaderActions />} />
+      <div className="space-y-3">
+        <MascotPeek kind="pair">
+          <Accordion id="look" title={t('Aspetto')} icon={<Palette size={20} />} summary={`${themeLabel} · ${lp === 'auto' ? t('Automatico') : LANG_NAME[lp]}`}>
+            <AppearanceCard onChange={() => refresh((n) => n + 1)} />
           </Accordion>
-          <Accordion id="notif" title={t('Notifiche')} icon={<Bell size={22} />} summary={prefs.systemNotif || prefs.pushEnabled ? t('Attive su questo dispositivo') : t('Disattivate')}>
-            <NotificationsCard />
-          </Accordion>
-          <Accordion id="members" title={t('Membri')} icon={<Users size={22} />} summary={members.map((m) => m.name).join(', ')}>
-            <MembersSection />
-          </Accordion>
-          <Accordion id="catalog" title={t('Catalogo alimenti')} icon={<Utensils size={22} />} summary={t('{n} alimenti condivisi', { n: foods.length })}>
-            <CatalogSection />
-          </Accordion>
-          <Accordion id="look" title={t('Aspetto')} icon={<Palette size={22} />} summary={t('Tema chiaro, scuro o automatico')}>
-            <AppearanceSection />
-          </Accordion>
-          <Accordion id="data" title={t('Dati')} icon={<Database size={22} />} summary={t('Nome casa, backup, ripristino')}>
-            <DataSection />
-          </Accordion>
-        </div>
-      </MascotPeek>
+        </MascotPeek>
+
+        <Accordion id="house" title={t('Casa')} icon={<Home size={20} />} summary={db.houseName}>
+          <label className="label !mt-0">{t('Nome della casa')}</label>
+          <CommitInput value={db.houseName} onCommit={(v) => v.trim() && commit((d) => renameHouse(d, v))} />
+        </Accordion>
+
+        <Accordion id="members" title={t('Membri della casa')} icon={<UserRound size={20} />} summary={tp(members.length, '{n} membro', '{n} membri', { n: members.length })}>
+          <MembersSection />
+        </Accordion>
+
+        <Accordion id="sync" title={t('Sincronizzazione e account')} icon={<Cloud size={20} />} summary={syncSummary}>
+          <SyncCard />
+        </Accordion>
+
+        <Accordion id="notif" title={t('Notifiche')} icon={<Bell size={20} />} summary={prefs.systemNotif || prefs.pushEnabled ? t('Attive su questo dispositivo') : t('Disattivate (solo la campanella)')}>
+          <NotificationsCard />
+        </Accordion>
+
+        <Accordion id="catalog" title={t('Catalogo alimenti')} icon={<Utensils size={20} />} summary={t('{n} alimenti condivisi', { n: foods.length })}>
+          <CatalogSection />
+        </Accordion>
+
+        <Accordion id="plan" title={t('Piano alimentare (JSON)')} icon={<FileJson size={20} />} summary={t('Importa ed esporta il piano settimanale')}>
+          <MemberPills members={members} value={member.id} onChange={setMemberId} />
+          <PlanJsonCard bare />
+        </Accordion>
+
+        <Accordion id="data" title={t('Dati')} icon={<Database size={20} />} summary={t('{a} alimenti · {b} membri', { a: foods.length, b: members.length })}>
+          <DataSection />
+        </Accordion>
+
+        <p className="flex gap-2 px-1 pb-4 text-xs text-muted"><ShieldCheck size={16} className="shrink-0" /><span>{t('I dati restano nel tuo Google Drive e su questo dispositivo: nessun server di terze parti per i dati.')} · Meal Duo · <a className="font-semibold text-brand" href={import.meta.env.BASE_URL + 'privacy.html'}>{t('Informativa sulla privacy')}</a></span></p>
+      </div>
     </>
   )
 }
 
 /* =============== Membri =============== */
 function MembersSection() {
-  const { members, sync } = useStore()
+  const { members, sync, me } = useStore()
   const [sheet, setSheet] = useState<{ member?: Member } | null>(null)
   const [invite, setInvite] = useState(false)
   const owner = sync.ownerEmail?.toLowerCase()
@@ -65,7 +101,8 @@ function MembersSection() {
         {members.map((m) => (
           <li key={m.id} className="flex items-center gap-3 py-2.5">
             <Avatar member={m} size={40} />
-            <div className="min-w-0 flex-1"><p className="truncate font-semibold leading-tight">{m.name}{!!owner && m.email?.toLowerCase() === owner && <span className="ml-2 rounded-full bg-brand/10 px-2 py-0.5 text-[11px] font-semibold">{t('proprietario')}</span>}</p><p className="truncate text-xs text-muted">{m.email || t('Nessun account Google associato')}</p></div>
+            <div className="min-w-0 flex-1"><p className="truncate font-semibold leading-tight">{m.name}{!!owner && m.email?.toLowerCase() === owner && <span className="ml-2 rounded-full bg-brand/10 px-2 py-0.5 text-[11px] font-semibold">{t('proprietario')}</span>}</p><p className="truncate text-xs text-muted">{m.email || t('nessuna email')}</p></div>
+            {me?.id === m.id && <span className="chip chip-active !py-1 !text-xs"><Check size={14} />{t('Io')}</span>}
             <button className="glass-btn !h-10 !w-10 !p-0" aria-label={t('Modifica {name}', { name: m.name })} onClick={() => setSheet({ member: m })}><Pencil size={16} /></button>
           </li>
         ))}
@@ -266,50 +303,14 @@ function FoodSheet({ food, onClose }: { food?: FoodCatalogItem; onClose: () => v
   )
 }
 
-/* =============== Aspetto =============== */
-function AppearanceSection() {
-  const [theme, setT] = useState<Theme>(getTheme())
-  const [langPref, setLangP] = useState<LangPref>(getLangPref())
-  useLang()
-  const opts: { id: Theme; label: string; swatch: string; cat: 'mochi' | 'zenitsu' | 'pair' }[] = [
-    { id: 'light', label: 'Mochi', swatch: '#fff7ee', cat: 'mochi' },
-    { id: 'dark', label: 'Zenitsu', swatch: '#16181d', cat: 'zenitsu' },
-    { id: 'auto', label: t('Automatico'), swatch: 'linear-gradient(135deg, #fff7ee 50%, #16181d 50%)', cat: 'pair' },
-  ]
-  return (
-    <div className="grid grid-cols-3 gap-2">
-      {opts.map((o) => (
-        <button key={o.id} aria-pressed={theme === o.id} onClick={() => { setT(o.id); setTheme(o.id) }}
-          className={`relative flex flex-col items-center gap-2 rounded-2xl border p-2.5 transition active:scale-95 ${theme === o.id ? 'border-brand bg-brand/10' : 'border-line bg-bg/60'}`}>
-          <span className="flex h-14 w-full items-end justify-center overflow-hidden rounded-xl border border-line" style={{ background: o.swatch }}>
-            <MascotImg kind={o.cat} className="h-12 w-auto" />
-          </span>
-          <span className="text-xs font-semibold">{o.label}</span>
-          {theme === o.id && <Check size={14} className="absolute right-1.5 top-1.5 text-brand" strokeWidth={3} />}
-        </button>
-      ))}
-      <div className="col-span-3 mt-2">
-        <p className="label !mt-0">{t('Lingua')}</p>
-        <Segmented value={langPref} onChange={(v) => { setLangP(v); setLangPref(v) }} options={[{ id: 'auto', label: t('Auto') }, { id: 'it', label: LANG_NAME.it }, { id: 'en', label: LANG_NAME.en }]} />
-      </div>
-    </div>
-  )
-}
-
 /* =============== Dati =============== */
 function DataSection() {
-  const { db, commit, startFresh, importDatabase } = useStore()
+  const { db, startFresh, importDatabase } = useStore()
   const { showToast } = useUi()
-  const [house, setHouse] = useState(db.houseName)
   const file = useRef<HTMLInputElement>(null)
   return (
     <div>
-      <label className="label !mt-0">{t('Nome della casa')}</label>
-      <div className="flex gap-2">
-        <input className="field" value={house} onChange={(e) => setHouse(e.target.value)} />
-        <button className="glass-btn btn-primary shrink-0" disabled={!house.trim() || house === db.houseName} onClick={() => commit((d) => renameHouse(d, house))}>{t('Salva')}</button>
-      </div>
-      <div className="mt-4 grid grid-cols-2 gap-2">
+      <div className="grid grid-cols-2 gap-2">
         <button className="glass-btn" onClick={() => downloadJson('meal-duo-backup.json', db)}>{t('Backup JSON')}</button>
         <button className="glass-btn" onClick={() => file.current?.click()}>{t('Ripristina')}</button>
       </div>
