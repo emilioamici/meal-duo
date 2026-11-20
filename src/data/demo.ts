@@ -65,7 +65,7 @@ function build(): AppDatabase {
   return {
     schema: 'meal-duo-db',
     version: 1,
-    houseName: 'Casa Demo',
+    houseName: 'Famiglia Demo',
     members: [{ ...emilio, email: undefined }, { ...sara, email: undefined }],
     foodCatalog: [...foodMap.values()],
     plans,

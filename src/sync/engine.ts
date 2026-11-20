@@ -35,7 +35,7 @@ interface Persisted {
   email: string | null
   /** nome Google dell'account (nome predefinito del membro) */
   name: string | null
-  /** email di chi ha creato la casa = proprietario del file */
+  /** email di chi ha creato la famiglia = proprietario del file */
   ownerEmail: string | null
   /** può invitare/rimuovere persone (proprietario del file) */
   canShare: boolean
@@ -268,7 +268,7 @@ export class SyncEngine {
   }
 
   /**
-   * Crea la casa: un nuovo database nel Drive di chi lo crea (proprietario). Se sul dispositivo ci sono già dati propri
+   * Crea la famiglia: un nuovo database nel Drive di chi lo crea (proprietario). Se sul dispositivo ci sono già dati propri
    * (non i dati demo) li tiene e gli dà solo il nome.
    */
   async createHouse(opts: { houseName: string; memberName: string; folderId: string | null; keepLocal: boolean }): Promise<void> {
@@ -276,7 +276,7 @@ export class SyncEngine {
     if (!this.p.email) await this.loadProfile()
     const email = this.p.email ?? ''
     const local = this.host!.getDb()
-    const fresh = emptyDb(opts.houseName.trim() || t('La nostra casa'), opts.memberName.trim() || 'Io', email)
+    const fresh = emptyDb(opts.houseName.trim() || t('La nostra famiglia'), opts.memberName.trim() || 'Io', email)
     const keep = opts.keepLocal && !isPristine(local)
     const db: Db = keep ? { ...local, houseName: fresh.houseName, lastUpdated: nowIso() } : { ...fresh, lastUpdated: nowIso() }
     const f = await drive.createFile(token, JSON.stringify(db), DB_FILE_NAME, opts.folderId)
@@ -314,7 +314,7 @@ export class SyncEngine {
   /** Invita un account Google: concede l'accesso in modifica al file (solo il proprietario). */
   async invite(email: string, houseName: string): Promise<void> {
     if (!this.p.fileId) return
-    await drive.shareFile(await this.token(), this.p.fileId, email.trim(), t('Ti invito nella casa «{name}» su Meal Duo. Apri l\'app, accedi con questo account Google e scegli il database condiviso.', { name: houseName }))
+    await drive.shareFile(await this.token(), this.p.fileId, email.trim(), t('Ti invito nella famiglia «{name}» su Meal Duo. Apri l\'app, accedi con questo account Google e scegli il database condiviso.', { name: houseName }))
   }
 
   /** Revoca l'accesso al file a un account. false se non aveva permessi. */
@@ -345,7 +345,7 @@ export class SyncEngine {
     await drive.moveFile(token, this.p.fileId, folderId, meta.parents ?? [])
   }
 
-  /** Selettore di Google: il database della casa (anche condiviso da altri). Solo con il permesso `drive.file`. */
+  /** Selettore di Google: il database della famiglia (anche condiviso da altri). Solo con il permesso `drive.file`. */
   async pickDatabase(): Promise<Picked | null> {
     return pickDatabase(await this.token())
   }
@@ -442,8 +442,8 @@ export class SyncEngine {
       return this.set('auth', t('Sessione Google scaduta: riconnettiti per continuare a sincronizzare.'))
     }
     if (e instanceof DriveError) {
-      if (e.status === 404 && pickerConfigured()) return this.set('error', t('Non riesco ad aprire il database: scegli di nuovo il file con il selettore di Google (Impostazioni → Sincronizzazione e account). Se non lo vedi, forse sei stato rimosso dalla casa o il file è stato spostato.'))
-      if (e.status === 404) return this.set('error', t('Non hai più accesso al database: forse sei stato rimosso dalla casa o il file è stato spostato. Puoi scollegarti dalle Impostazioni.'))
+      if (e.status === 404 && pickerConfigured()) return this.set('error', t('Non riesco ad aprire il database: scegli di nuovo il file con il selettore di Google (Impostazioni → Sincronizzazione e account). Se non lo vedi, forse sei stato rimosso dalla famiglia o il file è stato spostato.'))
+      if (e.status === 404) return this.set('error', t('Non hai più accesso al database: forse sei stato rimosso dalla famiglia o il file è stato spostato. Puoi scollegarti dalle Impostazioni.'))
       if (e.status === 403) return this.set('error', t('Permesso negato: serve l\'accesso in modifica al file.') + ' ' + e.message)
       return this.set('error', t('Errore Google Drive ({status}): {message}', { status: e.status, message: e.message }))
     }

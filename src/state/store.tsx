@@ -199,7 +199,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     return () => navigator.serviceWorker.removeEventListener('message', onMsg)
   }, [])
 
-  // ----- notifiche ricevute (per casa e per membro, solo su questo dispositivo)
+  // ----- notifiche ricevute (per famiglia e per membro, solo su questo dispositivo)
   const notifKey = sync.fileId && me ? `${NOTIF_PREFIX}${sync.fileId}:${me.id}` : null
   const [notifications, setNotifications] = useState<Notif[]>([])
   const [toast, setToast] = useState<Notif | null>(null)
@@ -229,7 +229,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const startFresh = useCallback(() => {
     const keepEmail = meRef.current?.email ?? engine.getSnapshot().email ?? undefined
-    apply(() => emptyDb(t('La nostra casa'), meRef.current?.name ?? 'Io', keepEmail), true)
+    apply(() => emptyDb(t('La nostra famiglia'), meRef.current?.name ?? 'Io', keepEmail), true)
   }, [apply])
   const importDatabase = useCallback((next: AppDatabase) => apply((prev) => mergeDatabases(prev, next), true), [apply])
 

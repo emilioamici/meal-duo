@@ -79,7 +79,7 @@ export function parseDb(raw: unknown): AppDatabase {
   return {
     schema: 'meal-duo-db',
     version: 1,
-    houseName: str(raw.houseName, 'La nostra casa'),
+    houseName: str(raw.houseName, 'La nostra famiglia'),
     members,
     foodCatalog,
     plans,

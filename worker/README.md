@@ -5,7 +5,7 @@ Piccolo server che permette di ricevere le notifiche **anche con l'app chiusa**.
 ## Come funziona
 - Ogni dispositivo che attiva le notifiche si **iscrive** al server (indirizzo del servizio di push del browser + chiavi di cifratura).
 - Quando qualcuno aggiunge una transazione o un conto, **la sua app dice al server a chi inviare la notifica** (le regole sono quelle delle notifiche nell'app). Il server cifra il messaggio e lo spedisce al servizio di push di Google/Apple/Mozilla, che lo consegna al telefono.
-- Il server **non ha mai accesso a Drive** e, per le sole notifiche, non conserva token Google (con l'accesso persistente facoltativo conserva invece un token di rinnovo cifrato: vedi sotto). A ogni richiesta controlla il token Google di chi scrive: deve essere valido e avere accesso al file del database della casa. Salva solo gli iscritti, sotto chiave `id del database + email`.
+- Il server **non ha mai accesso a Drive** e, per le sole notifiche, non conserva token Google (con l'accesso persistente facoltativo conserva invece un token di rinnovo cifrato: vedi sotto). A ogni richiesta controlla il token Google di chi scrive: deve essere valido e avere accesso al file del database della famiglia. Salva solo gli iscritti, sotto chiave `id del database + email`.
 - Il messaggio è cifrato fino al dispositivo (RFC 8291). Il testo però passa dal server: nella notifica ci sono il nome di chi ha fatto la modifica e il nome dell'articolo.
 
 ## Cosa serve
@@ -108,7 +108,7 @@ Non serve altro (l'app usa lo stesso indirizzo del server delle notifiche). Sull
 ## Se qualcosa non va
 - **«Origine non autorizzata» (403):** `ALLOWED_ORIGINS` non coincide con l'indirizzo del sito. Correggi `wrangler.toml` e rifai `npx wrangler deploy`.
 - **«Sessione Google non valida» (401):** il token Google è scaduto; tocca *Riconnetti* nell'app e riprova.
-- **«Nessun accesso al database» (403):** l'account non ha accesso al file del database della casa.
+- **«Nessun accesso al database» (403):** l'account non ha accesso al file del database della famiglia.
 - **La prova non arriva:** controlla che il permesso notifiche non sia bloccato nelle impostazioni del browser per il sito, e che l'app sia in background (con l'app aperta la notifica compare nella campanella). Per vedere i log: `npx wrangler tail`.
 - **Un dispositivo non riceve più nulla:** riattiva l'interruttore (il server elimina le iscrizioni non più valide).
 

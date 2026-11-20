@@ -16,10 +16,10 @@
   <p>Meal Duo è un'applicazione web personale per gestire i piani alimentari settimanali di una famiglia e la relativa lista della spesa. Questa pagina spiega quali dati usa e dove restano.</p>
 
   <h2>Dove sono i tuoi dati</h2>
-  <p>I piani alimentari, il catalogo degli alimenti, la lista della spesa e l'elenco dei membri (nome ed email) sono salvati in un file JSON (<code>meal-duo-db.json</code>) nel tuo Google Drive, oppure in quello della persona che ha creato la casa e lo ha condiviso con i membri invitati. Una copia di lavoro resta nel browser del tuo dispositivo, così l'app funziona anche offline. L'applicazione non ha un database proprio e il codice pubblico non contiene dati personali.</p>
+  <p>I piani alimentari, il catalogo degli alimenti, la lista della spesa e l'elenco dei membri (nome ed email) sono salvati in un file JSON (<code>meal-duo-db.json</code>) nel tuo Google Drive, oppure in quello della persona che ha creato la famiglia e lo ha condiviso con i membri invitati. Una copia di lavoro resta nel browser del tuo dispositivo, così l'app funziona anche offline. L'applicazione non ha un database proprio e il codice pubblico non contiene dati personali.</p>
 
   <h2>Accesso a Google</h2>
-  <p>L'accesso avviene con il tuo account Google. L'applicazione chiede l'accesso a Google Drive solo per leggere e scrivere il file dei dati e per condividerlo con i membri della casa; con lo scope <code>drive.file</code> può vedere esclusivamente i file che ha creato o che le hai indicato tu. Legge il tuo indirizzo email e il tuo nome solo per riconoscerti nella casa.</p>
+  <p>L'accesso avviene con il tuo account Google. L'applicazione chiede l'accesso a Google Drive solo per leggere e scrivere il file dei dati e per condividerlo con i membri della famiglia; con lo scope <code>drive.file</code> può vedere esclusivamente i file che ha creato o che le hai indicato tu. Legge il tuo indirizzo email e il tuo nome solo per riconoscerti nella famiglia.</p>
 
   <h2>Server di supporto (facoltativo)</h2>
   <p>Se attivi le notifiche push o l'accesso persistente, un piccolo servizio su Cloudflare Workers gestito da chi ha installato l'applicazione conserva: l'iscrizione alle notifiche del tuo dispositivo e, per l'accesso persistente, un token di rinnovo di Google <strong>cifrato</strong>. Il servizio non legge il contenuto dei tuoi dati e non li memorizza. Il testo di una notifica (il nome di chi ha fatto la modifica e il nome dell'articolo) transita dal servizio.</p>

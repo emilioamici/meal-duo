@@ -64,7 +64,7 @@ function AppShell() {
 
 /**
  * Senza un database collegato si passa dal Gate (login Google); con il database collegato l'app funziona anche offline.
- * Sessione scaduta (con casa collegata): il Gate di riconnessione copre tutto e i dati non si vedono; l'app resta montata sotto,
+ * Sessione scaduta (con famiglia collegata): il Gate di riconnessione copre tutto e i dati non si vedono; l'app resta montata sotto,
  * inerte, così quello che stavi scrivendo non si perde e dopo l'accesso si riprende da dove si era.
  */
 function Root() {
