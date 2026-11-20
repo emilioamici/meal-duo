@@ -136,7 +136,8 @@ function MemberSheet({ open, member, onClose }: { open: boolean; member?: Member
     onClose()
   }
   return (
-    <Sheet open={open} onClose={onClose} title={member ? t('Modifica membro') : t('Nuovo membro')}>
+    <Sheet open={open} onClose={onClose} title={member ? t('Modifica membro') : t('Nuovo membro')}
+      footer={<button className="glass-btn btn-primary w-full !py-3.5" disabled={!name.trim()} onClick={save}>{t('Salva')}</button>}>
       <label className="label !mt-2">{t('Nome')}</label>
       <input className="field" value={name} autoFocus={!member} onChange={(e) => setName(e.target.value)} />
       <label className="label">{t('Email Google (facoltativa)')}</label>
@@ -150,7 +151,6 @@ function MemberSheet({ open, member, onClose }: { open: boolean; member?: Member
           </button>
         ))}
       </div>
-      <button className="glass-btn btn-primary mt-5 w-full !py-3.5" disabled={!name.trim()} onClick={save}>{t('Salva')}</button>
       {member && members.length > 1 && (
         <ConfirmButton className="mt-2 w-full" label={<><Trash2 size={16} />{t('Rimuovi membro')}</>} confirmLabel={member.email && sync.canShare ? t('Tocca ancora: perderà l\'accesso a Drive e il suo piano verrà eliminato') : t('Tocca ancora: il suo piano verrà eliminato')}
           onConfirm={async () => {
@@ -190,7 +190,8 @@ function InviteSheet({ open, onClose }: { open: boolean; onClose: () => void }) 
   }
 
   return (
-    <Sheet open={open} onClose={onClose} title={t('Invita un familiare')}>
+    <Sheet open={open} onClose={onClose} title={t('Invita un familiare')}
+      footer={<button className="glass-btn btn-primary w-full !py-3.5" disabled={!valid || busy} onClick={() => void send()}><Mail size={16} />{t('Invia invito')}</button>}>
       <p className="text-sm text-muted">{tb('Drive concede il ruolo <b>Editor</b> sul database e manda l\'email di invito. Il familiare, in Meal Duo, accede con Google e sceglie il database condiviso (Picker).')}</p>
       {err && <p role="alert" className="mt-3 rounded-xl bg-exp/15 p-3 text-sm"><span className="font-bold text-exp">{t('Errore:')}{' '}</span>{err}</p>}
       <label className="label">{t('Email Google')}</label>
@@ -205,7 +206,6 @@ function InviteSheet({ open, onClose }: { open: boolean; onClose: () => void }) 
         </>
       )}
       {target === 'new' && (<><label className="label">{t('Nome')}</label><input className="field" value={name} placeholder={t('es. Sara')} onChange={(e) => setName(e.target.value)} /></>)}
-      <button className="glass-btn btn-primary mt-5 w-full !py-3.5" disabled={!valid || busy} onClick={() => void send()}><Mail size={16} />{t('Invia invito')}</button>
     </Sheet>
   )
 }
@@ -279,7 +279,8 @@ function FoodSheet({ food, onClose }: { food?: FoodCatalogItem; onClose: () => v
     onClose()
   }
   return (
-    <Sheet open={!!food} onClose={onClose} title={t('Alimento')}>
+    <Sheet open={!!food} onClose={onClose} title={t('Alimento')}
+      footer={<button className="glass-btn btn-primary w-full !py-3.5" disabled={!name.trim()} onClick={save}>{t('Salva')}</button>}>
       <label className="label !mt-2">{t('Nome canonico')}</label>
       <input className="field" value={name} onChange={(e) => setName(e.target.value)} />
       <div className="grid grid-cols-2 gap-3">
@@ -290,7 +291,6 @@ function FoodSheet({ food, onClose }: { food?: FoodCatalogItem; onClose: () => v
       <div className="-mx-1 flex flex-wrap gap-2 px-1">{FOOD_CATEGORIES.map((c) => <button key={c} type="button" className={`chip !text-xs ${category === c ? 'chip-active' : ''}`} onClick={() => setCategory(c)}>{c}</button>)}</div>
       <label className="label">{t('Sinonimi (separati da virgola)')}</label>
       <input className="field" value={aliases} placeholder={t('pollo, petto pollo')} onChange={(e) => setAliases(e.target.value)} />
-      <button className="glass-btn btn-primary mt-4 w-full !py-3.5" disabled={!name.trim()} onClick={save}>{t('Salva')}</button>
 
       <label className="label">{t('Unisci un duplicato in «{name}»', { name: food?.name ?? '' })}</label>
       <input className="field" value={mergeQ} placeholder={t('Cerca l\'alimento duplicato')} onChange={(e) => setMergeQ(e.target.value)} />

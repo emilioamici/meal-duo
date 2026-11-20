@@ -17,7 +17,7 @@ export function FoodInput({ value, onChange, catalog, onPick, autoFocus }: {
   autoFocus?: boolean
 }) {
   const [focused, setFocused] = useState(false)
-  const suggestions = useMemo(() => searchFoods(catalog, value, 6), [catalog, value])
+  const suggestions = useMemo(() => searchFoods(catalog, value, 4), [catalog, value])
   const exact = suggestions.some((f) => normalizeName(f.name) === normalizeName(value))
   const showList = focused && value.trim().length > 0 && (suggestions.length > 0 || !exact)
 

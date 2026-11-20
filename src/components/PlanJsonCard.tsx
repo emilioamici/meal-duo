@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Download, FileJson, FileUp, Upload } from 'lucide-react'
+import { Accordion } from './ui'
 import { ImportSheet } from './ImportSheet'
 import { useStore } from '../state/store'
 import { useUi } from '../state/ui'
@@ -17,7 +18,7 @@ export function PlanJsonCard({ bare = false }: { bare?: boolean }) {
   const fileName = `meal-duo-${member.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}.json`
   const body = (
     <>
-      <p className="mt-1 text-sm text-muted">{t('Esporta il piano di {name} o un tracciato da compilare altrove (anche con un assistente AI), poi reimportalo: i nomi vengono associati al catalogo della casa.', { name: member.name })}</p>
+      <p className="text-sm text-muted">{t('Esporta il piano di {name} o un tracciato da compilare altrove (anche con un assistente AI), poi reimportalo: i nomi vengono associati al catalogo della casa.', { name: member.name })}</p>
       <div className="mt-3 grid grid-cols-2 gap-2">
         <button className="glass-btn btn-primary" onClick={() => setImportOpen(true)}><Upload size={16} />{t('Importa piano')}</button>
         <button className="glass-btn" onClick={() => { downloadJson(fileName, exportPlan(db, member.id)); showToast(t('Piano esportato')) }}><Download size={16} />{t('Esporta piano')}</button>
@@ -30,9 +31,10 @@ export function PlanJsonCard({ bare = false }: { bare?: boolean }) {
   )
   if (bare) return <div>{body}</div>
   return (
-    <section className="card mt-3 p-4">
-      <div className="flex items-center gap-2"><FileJson size={20} className="text-brand" /><h2 className="font-bold">{t('Piano in JSON')}</h2></div>
-      {body}
-    </section>
+    <div className="mt-3">
+      <Accordion id="week-json" title={t('Piano in JSON')} icon={<FileJson size={20} />} summary={t('Importa ed esporta il piano settimanale')} defaultOpen>
+        {body}
+      </Accordion>
+    </div>
   )
 }

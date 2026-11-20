@@ -1,6 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
-import { useOverlay } from '../state/overlay'
 import { AnimatePresence, motion, useDragControls } from 'framer-motion'
 import { ChevronDown, X } from 'lucide-react'
 import type { Member } from '../types'
@@ -97,45 +96,72 @@ export function Accordion({ id, title, icon, summary, defaultOpen = false, child
   )
 }
 
-/* ---------- Bottom sheet (§3.4) ---------- */
+/* ---------- Bottom sheet (§3.4, come in MoneyDuo) ---------- */
+
+/**
+ * Spazio occupato dalla tastiera, dal visual viewport (iOS e Android): serve a tenere il foglio SOPRA la tastiera.
+ * Su iOS la tastiera non ridimensiona il layout viewport: senza questo il foglio, ancorato in basso, resta coperto.
+ */
+function useKeyboard(active: boolean): { inset: number; height: number } {
+  const [k, setK] = useState({ inset: 0, height: 0 })
+  useEffect(() => {
+    const vv = typeof window !== 'undefined' ? window.visualViewport : null
+    if (!active || !vv) return
+    const update = () => setK({ inset: Math.max(0, Math.round(window.innerHeight - vv.height - vv.offsetTop)), height: Math.round(vv.height) })
+    update()
+    vv.addEventListener('resize', update)
+    vv.addEventListener('scroll', update)
+    return () => { vv.removeEventListener('resize', update); vv.removeEventListener('scroll', update); setK({ inset: 0, height: 0 }) }
+  }, [active])
+  return k
+}
+
+/**
+ * Foglio ancorato in basso (centrato su desktop), in un portal su `document.body`: nessun antenato con transform/overflow.
+ * Con il foglio aperto la pagina sotto non scorre; con la tastiera aperta il foglio si alza e si accorcia per restare visibile.
+ * L'azione principale va in `footer` (resta sempre a portata di pollice, fuori dall'area che scorre).
+ */
 export function Sheet({ open, onClose, title, children, footer }: { open: boolean; onClose: () => void; title: string; children: ReactNode; footer?: ReactNode }) {
   const controls = useDragControls()
-  const { sheets } = useOverlay()
+  const kb = useKeyboard(open)
   useEffect(() => {
     if (!open) return
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
     window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
+    const prev = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => { window.removeEventListener('keydown', onKey); document.body.style.overflow = prev }
   }, [open, onClose])
-  if (!sheets) return null
+  if (typeof document === 'undefined') return null
   return createPortal(
     <AnimatePresence>
       {open && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center md:absolute">
+        <div className="fixed inset-0 z-50 flex items-end justify-center md:items-center" style={{ paddingBottom: kb.inset }}>
           <motion.div className="absolute inset-0 bg-ink/30 backdrop-blur-sm"
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={onClose} />
           <motion.div
             role="dialog" aria-modal="true" aria-label={title}
-            className="glass-strong relative z-10 flex max-h-[92%] w-full max-w-md flex-col rounded-b-none"
+            className="glass-strong relative z-10 flex w-full max-w-md flex-col rounded-b-none md:max-w-lg md:!rounded-[2rem]"
+            style={{ maxHeight: kb.height ? `min(92dvh, ${kb.height - 12}px)` : '92dvh' }}
             initial={{ y: 48, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: '100%', opacity: 0 }}
             transition={{ type: 'spring', stiffness: 380, damping: 38 }}
             drag="y" dragControls={controls} dragListener={false}
             dragConstraints={{ top: 0, bottom: 0 }} dragElastic={{ top: 0, bottom: 0.6 }}
             onDragEnd={(_, i) => { if (i.offset.y > 120 || i.velocity.y > 600) onClose() }}>
-            <div className="flex cursor-grab touch-none justify-center pb-1 pt-3" onPointerDown={(e) => controls.start(e)}>
+            <div className="flex shrink-0 cursor-grab touch-none justify-center pb-1 pt-3" onPointerDown={(e) => controls.start(e)}>
               <div className="h-1.5 w-10 rounded-full bg-muted/50" />
             </div>
-            <div className="flex items-center justify-between px-5 pb-1">
+            <div className="flex shrink-0 items-center justify-between px-5 pb-1">
               <h2 className="text-xl font-bold">{title}</h2>
               <button onClick={onClose} className="glass-btn !p-2" aria-label={t('Chiudi')}><X size={18} /></button>
             </div>
-            <div className={`overflow-y-auto px-5 pt-1 ${footer ? 'pb-3' : 'pb-8 pb-safe'}`}>{children}</div>
-            {footer && <div className="border-t border-line/60 px-5 pb-6 pt-3 pb-safe">{footer}</div>}
+            <div className={`min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 pt-1 ${footer ? 'pb-3' : kb.inset ? 'pb-4' : 'pb-8 pb-safe'}`}>{children}</div>
+            {footer && <div className={`shrink-0 border-t border-line/60 px-5 pt-3 ${kb.inset ? 'pb-3' : 'pb-4 pb-safe'}`}>{footer}</div>}
           </motion.div>
         </div>
       )}
     </AnimatePresence>,
-    sheets,
+    document.body,
   )
 }
 

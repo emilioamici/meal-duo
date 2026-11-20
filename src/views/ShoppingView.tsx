@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { Check, Plus, RotateCcw, X } from 'lucide-react'
-import { PageHeader, CleanBar, Segmented, Sheet, ConfirmButton, EmptyCard, Avatar } from '../components/ui'
+import { Check, Plus, RotateCcw, SlidersHorizontal, X } from 'lucide-react'
+import { PageHeader, CleanBar, Segmented, Sheet, ConfirmButton, EmptyCard, Avatar, Accordion } from '../components/ui'
 import { Fab, HeaderActions } from '../components/Chrome'
 import { MascotImg, MascotPeek } from '../components/Mascots'
 import { useStore } from '../state/store'
@@ -10,7 +10,7 @@ import { DAY_INDEXES, type DayIndex, type ExtraItem, type Member, type ShoppingL
 import { buildShoppingList, extraChecked, groupByCategory, liveExtras, shoppingProgress } from '../services/shoppingListEngine'
 import { addExtra, removeExtra, resetShopping, toggleCheck, toggleExtra } from '../services/dbOps'
 import { formatCompact, formatQuantity } from '../lib/units'
-import { t, dayShort } from '../i18n'
+import { t, dayShort, tp } from '../i18n'
 
 export function ShoppingView() {
   const { db, members, commit } = useStore()
@@ -43,6 +43,7 @@ export function ShoppingView() {
   }
 
   const remaining = progress.total - progress.done
+  const filterSummary = `${tp(members.length - filters.excludedMemberIds.length, '{n} persona', '{n} persone', { n: members.length - filters.excludedMemberIds.length })} · ${tp(DAY_INDEXES.length - filters.excludedDays.length, '{n} giorno', '{n} giorni', { n: DAY_INDEXES.length - filters.excludedDays.length })}`
   const excludedCount = filters.excludedMemberIds.length + filters.excludedDays.length
 
   return (
@@ -63,7 +64,8 @@ export function ShoppingView() {
       </MascotPeek>
 
       {/* ---- Barra filtri: escludi membri / giorni ---- */}
-      <section className="card mt-3 p-4" aria-label={t('Filtri di calcolo')}>
+      <div className="mt-3">
+      <Accordion id="shop-filters" title={t('Filtri di calcolo')} icon={<SlidersHorizontal size={20} />} summary={filterSummary} defaultOpen>
         <p className="label !mt-0">{t('Per chi')}</p>
         <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
           {members.map((m) => {
@@ -91,7 +93,8 @@ export function ShoppingView() {
         <div className="mt-3">
           <Segmented value={grouped ? 'cat' : 'az'} onChange={(v) => setGrouped(v === 'cat')} options={[{ id: 'az', label: t('A–Z') }, { id: 'cat', label: t('Per categoria') }]} />
         </div>
-      </section>
+      </Accordion>
+      </div>
 
       {/* ---- Lista aggregata ---- */}
       <div className="mt-3 space-y-3">
@@ -187,13 +190,13 @@ function ExtraSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
     setName(''); setQty(''); onClose()
   }
   return (
-    <Sheet open={open} onClose={onClose} title={t('Voce extra')}>
+    <Sheet open={open} onClose={onClose} title={t('Voce extra')}
+      footer={<button className="glass-btn btn-primary w-full !py-3.5" disabled={!name.trim()} onClick={save}><Plus size={16} />{t('Aggiungi alla spesa')}</button>}>
       <p className="text-sm text-muted">{t('Articoli non legati alla dieta (es. carta forno, detersivo).')}</p>
       <label className="label">{t('Nome')}</label>
       <input className="field" value={name} autoFocus placeholder={t('Carta forno')} onChange={(e) => setName(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && save()} />
       <label className="label">{t('Quantità (facoltativa)')}</label>
       <input className="field" value={qty} placeholder={t('2 rotoli')} onChange={(e) => setQty(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && save()} />
-      <button className="glass-btn btn-primary mt-5 w-full !py-3.5" disabled={!name.trim()} onClick={save}><Plus size={16} />{t('Aggiungi alla spesa')}</button>
     </Sheet>
   )
 }

@@ -1,11 +1,10 @@
 import { createContext, useContext } from 'react'
 
 /**
- * Nodi di montaggio FUORI dal contenitore animato (le pagine usano filter: blur → containing block, §2.2):
- *  - overlay: strato del FAB (#shell-overlay)
- *  - sheets: fogli e scrim
- * Sono nello stato di Shell (ref callback) così i consumatori si ri-renderizzano appena i nodi esistono.
+ * Nodo di montaggio del FAB, FUORI dal contenitore animato (le pagine usano filter: blur → containing block, §2.2).
+ * È nello stato di Shell (ref callback) così i consumatori si ri-renderizzano appena il nodo esiste.
+ * I fogli (Sheet) non lo usano più: vanno in un portal su document.body, come in MoneyDuo.
  */
-export interface OverlayHosts { overlay: HTMLElement | null; sheets: HTMLElement | null }
-export const OverlayCtx = createContext<OverlayHosts>({ overlay: null, sheets: null })
+export interface OverlayHosts { overlay: HTMLElement | null }
+export const OverlayCtx = createContext<OverlayHosts>({ overlay: null })
 export const useOverlay = (): OverlayHosts => useContext(OverlayCtx)
