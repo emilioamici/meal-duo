@@ -77,28 +77,29 @@ export function parsePlanJson(text: string): ParseResult {
   if (!isObj(raw)) return { ok: false, errors: [t('La radice del file deve essere un oggetto JSON.')], warnings }
   if (raw.format !== undefined && raw.format !== PLAN_FORMAT) warnings.push(t('Campo "format" inatteso ("{f}"): atteso "{e}".', { f: String(raw.format), e: PLAN_FORMAT }))
 
-  // varianti degli alimenti (facoltative): { from: {name, quantity, unit}, to: {name, quantity, unit} }
+  // varianti degli alimenti (facoltative): { from: {name, quantity, unit}, to: {name, quantity, unit} }.
+  // Un problema in una variante non blocca l'import: quella variante si salta con un avviso e il resto entra.
   const variants: ParsedVariant[] = []
+  const skip = (msg: string) => warnings.push(t('Variante saltata · {m}', { m: msg }))
   if (raw.variants !== undefined) {
-    if (!Array.isArray(raw.variants)) errors.push(t('"variants" deve essere un array di varianti.'))
+    if (!Array.isArray(raw.variants)) warnings.push(t('"variants" deve essere un array di varianti: ignorato.'))
     else raw.variants.forEach((v, vi) => {
       const vp = `variants[${vi}]`
       const side = (x: unknown, key: 'from' | 'to'): ParsedItem | undefined => {
         const sp = `${vp}.${key}`
-        if (!isObj(x) || typeof x.name !== 'string' || !x.name.trim()) { errors.push(t('{path}: serve un "name" non vuoto.', { path: sp })); return undefined }
+        if (!isObj(x) || typeof x.name !== 'string' || !x.name.trim()) { skip(t('{path}: serve un "name" non vuoto.', { path: sp })); return undefined }
         const q = parseQuantity(x.quantity)
-        if (q === undefined || q <= 0) { errors.push(t('{path} ({name}): "quantity" deve essere un numero maggiore di 0.', { path: sp, name: String(x.name) })); return undefined }
+        if (q === undefined || q <= 0) { skip(t('{path} ({name}): "quantity" deve essere un numero maggiore di 0.', { path: sp, name: String(x.name) })); return undefined }
         let unit = 'g'
         if (typeof x.unit === 'string' && x.unit.trim()) unit = cleanUnit(x.unit)
         else warnings.push(t('{path} ({name}): unità mancante, uso "g".', { path: sp, name: String(x.name) }))
         return { name: x.name.trim(), quantity: q, unit }
       }
-      if (!isObj(v)) { errors.push(t('{path}: la variante richiede "from" e "to".', { path: vp })); return }
+      if (!isObj(v)) { skip(t('{path}: la variante richiede "from" e "to".', { path: vp })); return }
       const from = side(v.from, 'from'), to = side(v.to, 'to')
       if (!from || !to) return
-      if (normalizeName(from.name) === normalizeName(to.name)) { errors.push(t('{path}: un alimento non può essere variante di se stesso ({name}).', { path: vp, name: from.name })); return }
-      if (toBase(1, from.unit).unit !== toBase(1, to.unit).unit) { errors.push(t('{path}: le unità non sono confrontabili ({a} e {b}).', { path: vp, a: from.unit, b: to.unit })); return }
-      variants.push({ from, to })
+      if (normalizeName(from.name) === normalizeName(to.name)) { skip(t('{path}: un alimento non può essere variante di se stesso ({name}).', { path: vp, name: from.name })); return }
+      variants.push({ from, to }) // le unità dei due lati possono essere diverse (es. 1 pz di uova = 50 g di albume)
     })
   }
 
@@ -151,7 +152,7 @@ export interface ImportReport {
   items: number
   /** varianti applicate al catalogo */
   variants: number
-  /** varianti non applicate (unità del catalogo non confrontabile) */
+  /** varianti non applicate (l'unità indicata non è confrontabile con quella dell'alimento nel catalogo) */
   variantsSkipped: string[]
 }
 

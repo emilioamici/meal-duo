@@ -112,7 +112,7 @@ describe('varianti nel JSON', () => {
   })
   it('le unità del file possono differire da quelle del catalogo (kg → g)', () => {
     const parsed = parsePlanJson(JSON.stringify({ variants: [{ from: { name: 'Riso basmati', quantity: 0.1, unit: 'kg' }, to: { name: 'Latte', quantity: 100, unit: 'ml' } }] }))
-    expect(parsed.ok).toBe(false) // g e ml non sono confrontabili
+    expect(parsed.ok).toBe(true) // anche tra unità di natura diversa (g ↔ ml): il fattore è tra le unità dei due alimenti
     const ok2 = parsePlanJson(JSON.stringify({ variants: [{ from: { name: 'Riso basmati', quantity: 0.1, unit: 'kg' }, to: { name: 'Farro', quantity: 0.12, unit: 'kg' } }] }))
     const seeded = applyImport(fixtureDb(), 'a', parsePlanJson(JSON.stringify({ variants: [{ from: { name: 'Riso basmati', quantity: 1, unit: 'g' }, to: { name: 'Farro', quantity: 1, unit: 'g' } }] })).plan!).db // Farro nasce in g
     const { db: out } = applyImport(seeded, 'a', ok2.plan!)
@@ -126,19 +126,35 @@ describe('varianti nel JSON', () => {
     expect(report.variantsSkipped).toEqual(['Uova = Albume'])
     expect(db.foodCatalog.find((f) => f.name === 'Uova')!.variants).toBeUndefined()
   })
-  it('errori con percorso preciso', () => {
+  it('unità diverse tra i due lati (1 pz di uova = 50 g di albume) sono valide e funzionano nei due sensi', () => {
+    const base = fixtureDb() // Uova in pz
+    const parsed = parsePlanJson(JSON.stringify({ variants: [{ from: { name: 'Uova', quantity: 1, unit: 'pz' }, to: { name: 'Albume', quantity: 50, unit: 'g' } }] }))
+    expect(parsed.ok).toBe(true)
+    expect(parsed.warnings).toEqual([])
+    const { db: out, report } = applyImport(base, 'a', parsed.plan!)
+    expect(report.variants).toBe(1)
+    const uova = out.foodCatalog.find((f) => f.name === 'Uova')!
+    const albume = out.foodCatalog.find((f) => f.name === 'Albume')!
+    expect(variantsOf(out, uova.id)[0]).toMatchObject({ ratio: 50, unit: 'g' })
+    expect(variantsOf(out, albume.id)[0]).toMatchObject({ ratio: 1 / 50, unit: 'pz' })
+  })
+  it('una variante sbagliata non blocca l\'import: viene saltata con un avviso e le altre entrano', () => {
     const r = parsePlanJson(JSON.stringify({ variants: [
       { from: { name: 'A', quantity: 1, unit: 'g' } },
       { from: { name: 'A', quantity: 0, unit: 'g' }, to: { name: 'B', quantity: 1, unit: 'g' } },
       { from: { name: 'Riso', quantity: 1, unit: 'g' }, to: { name: 'riso', quantity: 1, unit: 'g' } },
-      { from: { name: 'A', quantity: 1, unit: 'g' }, to: { name: 'B', quantity: 1, unit: 'pz' } },
+      { from: { name: 'Pasta', quantity: 100, unit: 'g' }, to: { name: 'Riso basmati', quantity: 120, unit: 'g' } },
     ] }))
-    expect(r.ok).toBe(false)
-    expect(r.errors.some((e) => e.includes('variants[0].to'))).toBe(true)
-    expect(r.errors.some((e) => e.includes('variants[1].from') && e.includes('maggiore di 0'))).toBe(true)
-    expect(r.errors.some((e) => e.includes('variants[2]') && e.includes('se stesso'))).toBe(true)
-    expect(r.errors.some((e) => e.includes('variants[3]') && e.includes('confrontabili'))).toBe(true)
-    expect(parsePlanJson(JSON.stringify({ days: [], variants: 'x' })).errors[0]).toMatch(/array di varianti/)
+    expect(r.ok).toBe(true)
+    expect(r.plan!.variants).toHaveLength(1)
+    const w = r.warnings.join('\n')
+    expect(w).toMatch(/Variante saltata.*variants\[0\]\.to/)
+    expect(w).toMatch(/variants\[1\]\.from.*maggiore di 0/)
+    expect(w).toMatch(/variants\[2\].*se stesso/)
+    expect(applyImport(fixtureDb(), 'a', r.plan!).report.variants).toBe(1)
+    // un errore nel piano resta un errore
+    expect(parsePlanJson(JSON.stringify({ days: [{ day: 'Funday', meals: [] }], variants: [] })).ok).toBe(false)
+    expect(parsePlanJson(JSON.stringify({ days: [], variants: 'x' })).warnings.join()).toMatch(/array di varianti/)
     expect(parsePlanJson('{}').errors[0]).toMatch(/days/)
   })
   it('export → import conserva le varianti (round-trip)', () => {
