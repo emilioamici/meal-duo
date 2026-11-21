@@ -10,6 +10,7 @@ import type {
 } from '../types'
 import { DAY_INDEXES } from '../types'
 import { round2, toBase } from '../lib/units'
+import { pantryStock, stockKey } from './pantry'
 
 export const NO_FILTERS: ShoppingFilters = { excludedMemberIds: [], excludedDays: [] }
 
@@ -52,6 +53,7 @@ export function buildShoppingList(db: AppDatabase, filters: ShoppingFilters = NO
     }
   }
 
+  const stock = pantryStock(db)
   const memberOrder = new Map(db.members.map((m, i) => [m.id, i]))
   const lines: ShoppingLine[] = []
   for (const [key, a] of acc) {
@@ -66,6 +68,7 @@ export function buildShoppingList(db: AppDatabase, filters: ShoppingFilters = NO
       perMember: [...a.per.entries()]
         .sort((x, y) => (memberOrder.get(x[0]) ?? 0) - (memberOrder.get(y[0]) ?? 0))
         .map(([memberId, quantity]) => ({ memberId, quantity: round2(quantity) })),
+      inPantry: Math.max(0, round2(stock.get(stockKey(a.foodId, a.unit)) ?? 0)),
       checked: isChecked(db, key),
     })
   }

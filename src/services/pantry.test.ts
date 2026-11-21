@@ -75,6 +75,17 @@ describe('dispensa: acquisti dalla spesa', () => {
   })
 })
 
+describe('lista della spesa e dispensa', () => {
+  it('la riga indica quanto ce n\'è già in dispensa, senza cambiare quanto serve', () => {
+    let db = withRice()
+    expect(line(db, 'riso|g').inPantry).toBe(0)
+    db = setPantryQuantity(db, 'riso', 'g', 60)
+    expect(line(db, 'riso|g')).toMatchObject({ total: 150, inPantry: 60 })
+    db = setPantryQuantity(db, 'riso', 'g', 0)
+    expect(line(db, 'riso|g').inPantry).toBe(0)
+  })
+})
+
 describe('pasto completato', () => {
   it('scala gli alimenti dalla dispensa e riaprendolo li rimette', () => {
     let db = checkLine(withRice(), line(withRice(), 'riso|g'), 500)

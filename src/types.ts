@@ -170,5 +170,7 @@ export interface ShoppingLine {
   unit: string
   total: number
   perMember: ShoppingMemberShare[]
+  /** quanto ce n'è già in dispensa (stessa unità base della riga) */
+  inPantry: number
   checked: boolean
 }
