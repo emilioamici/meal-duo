@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { Pencil, Plus } from 'lucide-react'
+import { Check, Pencil, Plus } from 'lucide-react'
 import { PageHeader, CleanBar, EmptyCard } from '../components/ui'
 import { Fab, HeaderActions } from '../components/Chrome'
 import { MascotImg, MascotPeek } from '../components/Mascots'
@@ -10,15 +10,16 @@ import { useStore } from '../state/store'
 import { useUi } from '../state/ui'
 import { useActiveMember } from '../state/hooks'
 import { DAY_INDEXES, type MealItem } from '../types'
-import { foodById } from '../services/dbOps'
+import { foodById, setMealDone } from '../services/dbOps'
+import { dateOfDay, mealKey } from '../services/pantry'
 import { dayTotals } from '../services/shoppingListEngine'
 import { formatQuantity } from '../lib/units'
 import { todayIndex } from '../lib/ids'
 import { t, dayLong, dayShort, locale, tp } from '../i18n'
 
 export function TodayView() {
-  const { db, members } = useStore()
-  const { day, setDay, setMemberId } = useUi()
+  const { db, members, commit } = useStore()
+  const { day, setDay, setMemberId, showToast, celebrate } = useUi()
   const member = useActiveMember()
   const plan = db.plans[member.id]?.days[day]
   const meals = plan?.meals ?? []
@@ -30,6 +31,16 @@ export function TodayView() {
   const [mealSheet, setMealSheet] = useState<{ meal?: { id: string; name: string } } | null>(null)
 
   const date = new Date()
+  const isDone = (mealId: string) => !!db.pantry.meals[mealKey(member.id, dateOfDay(day), mealId)]?.done
+  const doneCount = meals.filter((m) => isDone(m.id)).length
+  const toggleMeal = (e: React.MouseEvent, mealId: string, name: string) => {
+    const done = !isDone(mealId)
+    commit((d) => setMealDone(d, member.id, day, mealId, done))
+    if (!done) return showToast(t('«{name}» riaperto: la dispensa è stata ripristinata', { name }))
+    const missing = setMealDone(db, member.id, day, mealId, true).pantry.meals[mealKey(member.id, dateOfDay(day), mealId)]?.missing ?? 0
+    showToast(missing > 0 ? tp(missing, '«{name}» completato · {n} alimento non era in dispensa', '«{name}» completato · {n} alimenti non erano in dispensa', { name, n: missing }) : t('«{name}» completato: dispensa aggiornata', { name }))
+    if (doneCount + 1 === meals.length) celebrate(e.clientX, e.clientY, t('Giornata completata!'))
+  }
   const subtitle = day === today
     ? date.toLocaleDateString(locale(), { weekday: 'long', day: 'numeric', month: 'long' })
     : t('{day} · piano di {name}', { day: dayLong(day), name: member.name })
@@ -65,7 +76,7 @@ export function TodayView() {
               </div>
             </div>
             <div className="mt-3"><CleanBar pct={meals.length ? Math.round((filled / meals.length) * 100) : 0} height={10} /></div>
-            <p className="mt-1.5 text-xs text-muted">{t('{done} di {total} pasti pianificati', { done: filled, total: meals.length })}</p>
+            <p className="mt-1.5 text-xs text-muted">{t('{done} di {total} pasti pianificati', { done: filled, total: meals.length })}{doneCount > 0 && ` · ${t('{n} completati', { n: doneCount })}`}</p>
           </div>
         </MascotPeek>
       </div>
@@ -77,8 +88,13 @@ export function TodayView() {
               initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0, transition: { delay: i * 0.04 } }}
               exit={{ opacity: 0, x: 90, scale: 0.92 }} transition={{ type: 'spring', stiffness: 400, damping: 34 }}>
               <div className="flex items-center justify-between gap-2 px-1">
-                <div className="min-w-0">
-                  <h2 className="truncate text-lg font-bold leading-tight">{meal.name}</h2>
+                <motion.button whileTap={{ scale: 0.82 }} role="checkbox" aria-checked={isDone(meal.id)} disabled={meal.items.length === 0 && !isDone(meal.id)}
+                  aria-label={t(isDone(meal.id) ? '{name}: completato' : '{name}: da completare', { name: meal.name })} onClick={(e) => toggleMeal(e, meal.id, meal.name)}
+                  className={`glass-btn !h-10 !w-10 shrink-0 !p-0 ${isDone(meal.id) ? 'btn-primary' : ''}`}>
+                  {isDone(meal.id) && <Check size={20} strokeWidth={3} />}
+                </motion.button>
+                <div className="min-w-0 flex-1">
+                  <h2 className={`truncate text-lg font-bold leading-tight ${isDone(meal.id) ? 'line-through' : ''}`}>{meal.name}</h2>
                   <p className="text-xs text-muted">{meal.items.length === 0 ? t('Nessun alimento') : tp(meal.items.length, '{n} alimento', '{n} alimenti', { n: meal.items.length })}</p>
                 </div>
                 <div className="flex shrink-0 gap-1.5">

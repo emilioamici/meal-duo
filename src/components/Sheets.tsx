@@ -5,8 +5,9 @@ import { DAY_INDEXES } from '../types'
 import { Sheet, ConfirmButton } from './ui'
 import { FoodInput } from './FoodInput'
 import { useStore } from '../state/store'
+import { variantQuantities } from '../services/variants'
 import { addMeal, copyDay, ensureFood, foodById, liveFoods, removeItem, removeMeal, renameMeal, upsertItem } from '../services/dbOps'
-import { COMMON_UNITS, cleanUnit } from '../lib/units'
+import { COMMON_UNITS, cleanUnit, formatQuantity, round2 } from '../lib/units'
 import { normalizeName } from '../lib/foodMatch'
 import { uid } from '../lib/ids'
 import { useUi } from '../state/ui'
@@ -39,6 +40,8 @@ export function ItemSheet({ open, onClose, memberId, day, mealId, item }: {
 
   const qn = Number(qty.replace(',', '.'))
   const valid = name.trim().length > 0 && qty.trim() !== '' && Number.isFinite(qn) && qn > 0 && !!targetMeal
+
+  const variantOptions = foodId && qn > 0 ? variantQuantities(db, foodId, qn, unit) : []
 
   const save = () => {
     if (!valid || !targetMeal) return
@@ -77,6 +80,19 @@ export function ItemSheet({ open, onClose, memberId, day, mealId, item }: {
           <button key={u} type="button" className={`chip !py-1 !text-xs ${cleanUnit(unit) === u ? 'chip-active' : ''}`} onClick={() => setUnit(u)}>{u}</button>
         ))}
       </div>
+
+      {variantOptions.length > 0 && (
+        <>
+          <label className="label">{t('Sostituisci con una variante')}</label>
+          <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
+            {variantOptions.map(({ option, quantity }) => (
+              <button key={option.food.id} type="button" className="chip" onClick={() => { setName(option.food.name); setFoodId(option.food.id); setQty(String(round2(quantity))); setUnit(option.unit) }}>
+                {option.food.name} · {formatQuantity(quantity, option.unit)}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
 
       <label className="label">{t('Pasto')}</label>
       <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1">

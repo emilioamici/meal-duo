@@ -1,12 +1,14 @@
 /** Operazioni pure (immutabili) sul database: ogni mutazione aggiorna `updatedAt` dei record toccati. */
 import type {
-  AppDatabase, DayIndex, DayPlan, ExtraItem, FoodCatalogItem, FoodCategory, Meal, MealItem, Member, WeeklyPlan,
+  AppDatabase, PantryState, DayIndex, DayPlan, ExtraItem, FoodCatalogItem, FoodCategory, Meal, MealItem, Member, WeeklyPlan,
 } from '../types'
 import { DAY_INDEXES } from '../types'
 import { nowIso, uid } from '../lib/ids'
 import { capitalize, findCanonical, guessCategory, normalizeName } from '../lib/foodMatch'
 import { cleanUnit } from '../lib/units'
 import { getActor } from '../lib/actor'
+import { dateOfDay, mealKey, pantryStock, planConsumption, stockKey } from './pantry'
+import { withVariant, withoutVariant } from './variants'
 
 export const DEFAULT_MEALS = ['Colazione', 'Spuntino mattina', 'Pranzo', 'Merenda', 'Cena']
 export const MEMBER_COLORS = ['#c9692a', '#2a8f78', '#c0506a', '#e0a93e', '#8a5fa8', '#3f87b8', '#6aa84f', '#5b6577']
@@ -21,6 +23,8 @@ export function emptyPlan(memberId: string, at: string = nowIso()): WeeklyPlan {
   return { memberId, updatedAt: at, days: DAY_INDEXES.map(() => emptyDay(at)) }
 }
 
+export const emptyPantry = (): PantryState => ({ purchases: {}, adjustments: {}, meals: {} })
+
 /** Famiglia vuota con un solo membro (chi la crea). */
 export function emptyDb(houseName = 'La nostra famiglia', memberName = 'Io', email?: string): AppDatabase {
   const at = nowIso()
@@ -33,6 +37,7 @@ export function emptyDb(houseName = 'La nostra famiglia', memberName = 'Io', ema
     foodCatalog: [],
     plans: { [member.id]: emptyPlan(member.id, at) },
     shopping: { checks: {}, extras: [], resetAt: EPOCH },
+    pantry: emptyPantry(),
     lastUpdated: at,
   }
 }
@@ -68,7 +73,7 @@ export function ensureFood(
   return { db: touch({ ...db, foodCatalog: [...db.foodCatalog, food] }, at), food, created: true }
 }
 
-export function updateFood(db: AppDatabase, id: string, patch: Partial<Pick<FoodCatalogItem, 'name' | 'unit' | 'category' | 'aliases'>>): AppDatabase {
+export function updateFood(db: AppDatabase, id: string, patch: Partial<Pick<FoodCatalogItem, 'name' | 'unit' | 'category' | 'aliases' | 'variants'>>): AppDatabase {
   const at = nowIso()
   return touch({ ...db, foodCatalog: db.foodCatalog.map((f) => (f.id === id ? { ...f, ...patch, updatedAt: at } : f)) }, at)
 }
@@ -85,7 +90,25 @@ export function foodUsage(db: AppDatabase, foodId: string): number {
 export function deleteFood(db: AppDatabase, id: string): AppDatabase {
   if (foodUsage(db, id) > 0) return db
   const at = nowIso()
-  return touch({ ...db, foodCatalog: db.foodCatalog.map((f) => (f.id === id ? { ...f, deleted: true, updatedAt: at } : f)) }, at)
+  const foodCatalog = db.foodCatalog.map((f) => {
+    if (f.id === id) return { ...f, deleted: true, updatedAt: at }
+    if (!f.variants?.some((v) => v.foodId === id)) return f
+    const rest = f.variants.filter((v) => v.foodId !== id)
+    return { ...f, variants: rest.length ? rest : undefined, updatedAt: at }
+  })
+  return touch({ ...db, foodCatalog }, at)
+}
+
+/* ---------------- Varianti ---------------- */
+
+export function setVariant(db: AppDatabase, aId: string, bId: string, amount: number, variantAmount: number): AppDatabase {
+  const at = nowIso()
+  return touch({ ...db, foodCatalog: withVariant(db.foodCatalog, aId, bId, amount, variantAmount, at) }, at)
+}
+
+export function removeVariant(db: AppDatabase, aId: string, bId: string): AppDatabase {
+  const at = nowIso()
+  return touch({ ...db, foodCatalog: withoutVariant(db.foodCatalog, aId, bId, at) }, at)
 }
 
 /** Unisce `removeId` dentro `keepId`: tutte le voci dei piani puntano a `keepId`; il vecchio nome diventa alias. */
@@ -112,13 +135,27 @@ export function mergeFoods(db: AppDatabase, keepId: string, removeId: string): A
     plans[mid] = planTouched ? { ...plan, days, updatedAt: at } : plan
   }
   const aliases = [...new Set([...(keep.aliases ?? []), gone.name, ...(gone.aliases ?? [])])].filter((a) => normalizeName(a) !== normalizeName(keep.name))
+  const remap = <T extends { foodId: string }>(x: T): T => (x.foodId === removeId ? { ...x, foodId: keepId } : x)
+  const mapRecords = <T extends { foodId: string; updatedAt: string }>(r: Record<string, T>): Record<string, T> =>
+    Object.fromEntries(Object.entries(r).map(([k, v]) => [k, v.foodId === removeId ? { ...v, foodId: keepId, updatedAt: at } : v]))
+  const retarget = (f: FoodCatalogItem): FoodCatalogItem => {
+    const inherits = f.id === keepId && !!gone.variants?.length
+    if (!inherits && !f.variants?.some((v) => v.foodId === removeId)) return f
+    const list = [...(f.variants ?? []), ...(inherits ? gone.variants! : [])].map(remap).filter((v, i, a) => v.foodId !== f.id && a.findIndex((w) => w.foodId === v.foodId) === i)
+    return { ...f, variants: list.length ? list : undefined, updatedAt: at }
+  }
   return touch({
     ...db,
     plans,
+    pantry: {
+      purchases: mapRecords(db.pantry.purchases),
+      adjustments: mapRecords(db.pantry.adjustments),
+      meals: Object.fromEntries(Object.entries(db.pantry.meals).map(([k, m]) => [k, m.consumed.some((c) => c.foodId === removeId) ? { ...m, consumed: m.consumed.map(remap), updatedAt: at } : m])),
+    },
     foodCatalog: db.foodCatalog.map((f) => {
-      if (f.id === keepId) return { ...f, aliases, updatedAt: at }
+      if (f.id === keepId) return { ...retarget(f), aliases, updatedAt: at }
       if (f.id === removeId) return { ...f, deleted: true, updatedAt: at }
-      return f
+      return retarget(f)
     }),
   }, at)
 }
@@ -214,6 +251,49 @@ export function replacePlan(db: AppDatabase, memberId: string, days: DayPlan[]):
 export function toggleCheck(db: AppDatabase, key: string, checked: boolean, by?: string): AppDatabase {
   const at = nowIso()
   return touch({ ...db, shopping: { ...db.shopping, checks: { ...db.shopping.checks, [key]: { key, checked, by: by ?? getActor(), updatedAt: at } } } }, at)
+}
+
+/** Spunta una riga della spesa: con `quantity` (unità base della riga) il preso entra anche in dispensa. */
+export function checkLine(db: AppDatabase, line: { key: string; foodId: string; unit: string }, quantity: number | null): AppDatabase {
+  const at = nowIso()
+  const next = toggleCheck(db, line.key, true)
+  if (quantity === null || !(quantity > 0)) return next
+  const key = `${line.key}|${db.shopping.resetAt}`
+  const purchase = { key, foodId: line.foodId, unit: line.unit, quantity, by: getActor(), updatedAt: at }
+  return { ...next, pantry: { ...next.pantry, purchases: { ...next.pantry.purchases, [key]: purchase } } }
+}
+
+/** Toglie la spunta: l'acquisto corrispondente esce dalla dispensa. */
+export function uncheckLine(db: AppDatabase, lineKey: string): AppDatabase {
+  const at = nowIso()
+  const key = `${lineKey}|${db.shopping.resetAt}`
+  const next = toggleCheck(db, lineKey, false)
+  const p = next.pantry.purchases[key]
+  if (!p || p.deleted) return next
+  return { ...next, pantry: { ...next.pantry, purchases: { ...next.pantry.purchases, [key]: { ...p, deleted: true, by: getActor(), updatedAt: at } } } }
+}
+
+/** Porta la giacenza di `foodId` (unità base `unit`) a `target` con una correzione manuale. */
+export function setPantryQuantity(db: AppDatabase, foodId: string, unit: string, target: number): AppDatabase {
+  const at = nowIso()
+  const current = pantryStock(db).get(stockKey(foodId, unit)) ?? 0
+  const delta = Math.max(0, target) - current
+  if (Math.abs(delta) < 1e-9) return db
+  const id = uid('adj')
+  return touch({ ...db, pantry: { ...db.pantry, adjustments: { ...db.pantry.adjustments, [id]: { id, foodId, unit, quantity: delta, by: getActor(), updatedAt: at } } } }, at)
+}
+
+/** Completa (o riapre) un pasto: completandolo si scalano dalla dispensa gli alimenti, riaprendolo si rimettono. */
+export function setMealDone(db: AppDatabase, memberId: string, day: DayIndex, mealId: string, done: boolean): AppDatabase {
+  const meal = db.plans[memberId]?.days[day]?.meals.find((m) => m.id === mealId)
+  if (!meal) return db
+  const at = nowIso()
+  const date = dateOfDay(day)
+  const key = mealKey(memberId, date, mealId)
+  if (!!db.pantry.meals[key]?.done === done) return db
+  const { consumed, missing } = done ? planConsumption(db, meal.items) : { consumed: [], missing: 0 }
+  const log = { key, memberId, date, mealId, done, consumed, missing: missing || undefined, by: getActor(), updatedAt: at }
+  return touch({ ...db, pantry: { ...db.pantry, meals: { ...db.pantry.meals, [key]: log } } }, at)
 }
 
 export function addExtra(db: AppDatabase, name: string, quantity?: string): AppDatabase {

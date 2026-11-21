@@ -8,7 +8,8 @@ import { useStore } from '../state/store'
 import { useUi } from '../state/ui'
 import { DAY_INDEXES, type DayIndex, type ExtraItem, type Member, type ShoppingLine } from '../types'
 import { buildShoppingList, extraChecked, groupByCategory, liveExtras, shoppingProgress } from '../services/shoppingListEngine'
-import { addExtra, removeExtra, resetShopping, toggleCheck, toggleExtra } from '../services/dbOps'
+import { addExtra, checkLine, removeExtra, resetShopping, toggleExtra, uncheckLine } from '../services/dbOps'
+import { PantryPanel } from '../components/PantryPanel'
 import { formatCompact, formatQuantity } from '../lib/units'
 import { t, dayShort, tp } from '../i18n'
 
@@ -16,6 +17,8 @@ export function ShoppingView() {
   const { db, members, commit } = useStore()
   const { filters, setFilters, grouped, setGrouped, celebrate } = useUi()
   const [extraOpen, setExtraOpen] = useState(false)
+  const [mode, setMode] = useState<'list' | 'pantry'>('list')
+  const [buying, setBuying] = useState<{ line: ShoppingLine; x: number; y: number } | null>(null)
 
   const lines = useMemo(() => buildShoppingList(db, filters), [db, filters])
   const extras = liveExtras(db)
@@ -33,8 +36,15 @@ export function ShoppingView() {
     if (progress.total > 0 && willBeDone === progress.total) celebrate(e.clientX, e.clientY, t('Spesa completata!'))
   }
   const onToggleLine = (e: React.MouseEvent, l: ShoppingLine) => {
-    commit((d) => toggleCheck(d, l.key, !l.checked))
-    if (!l.checked) celebrateIfDone(e, progress.done + 1)
+    if (l.checked) return commit((d) => uncheckLine(d, l.key))
+    setBuying({ line: l, x: e.clientX, y: e.clientY }) // prima si chiede quanto ne è stato preso (entra in dispensa)
+  }
+  const confirmBuy = (quantity: number | null) => {
+    if (!buying) return
+    const { line, x, y } = buying
+    commit((d) => checkLine(d, line, quantity))
+    setBuying(null)
+    if (progress.total > 0 && progress.done + 1 === progress.total) celebrate(x, y, t('Spesa completata!'))
   }
   const onToggleExtra = (e: React.MouseEvent, x: ExtraItem) => {
     const was = extraChecked(db, x)
@@ -50,6 +60,9 @@ export function ShoppingView() {
     <>
       <PageHeader title={t('Spesa')} subtitle={progress.total === 0 ? t('Nessun articolo') : remaining === 0 ? t('Tutto nel carrello!') : t('{n} da comprare', { n: remaining })} right={<HeaderActions />} />
 
+      <Segmented value={mode} onChange={(v) => setMode(v as 'list' | 'pantry')} options={[{ id: 'list', label: t('Lista') }, { id: 'pantry', label: t('Dispensa') }]} />
+
+      {mode === 'pantry' ? <PantryPanel fabOpen /> : <>
       <MascotPeek kind="zenitsu" side="left">
         <div className="card p-4">
           <div className="flex items-end justify-between">
@@ -158,6 +171,8 @@ export function ShoppingView() {
 
       <Fab label={t('Aggiungi voce extra')} onClick={() => setExtraOpen(true)} />
       <ExtraSheet open={extraOpen} onClose={() => setExtraOpen(false)} />
+      <BuySheet buying={buying?.line ?? null} onClose={() => setBuying(null)} onConfirm={confirmBuy} />
+      </>}
     </>
   )
 }
@@ -168,6 +183,25 @@ function CheckButton({ checked, label, onClick }: { checked: boolean; label: str
       className={`glass-btn !h-10 !w-10 shrink-0 !p-0 ${checked ? 'btn-primary' : ''}`}>
       {checked && <Check size={20} strokeWidth={3} />}
     </motion.button>
+  )
+}
+
+/** Spunta con quantità: quanto ne è stato preso (default = quanto serve) entra in dispensa. */
+function BuySheet({ buying, onClose, onConfirm }: { buying: ShoppingLine | null; onClose: () => void; onConfirm: (quantity: number | null) => void }) {
+  const [seed, setSeed] = useState('')
+  const [qty, setQty] = useState('')
+  if (buying && seed !== buying.key) { setSeed(buying.key); setQty(String(buying.total)) }
+  if (!buying && seed) setSeed('')
+  const n = Number(qty.replace(',', '.'))
+  const valid = qty.trim() !== '' && Number.isFinite(n) && n > 0
+  return (
+    <Sheet open={!!buying} onClose={onClose} title={buying?.name ?? ''}
+      footer={<button className="glass-btn btn-primary w-full !py-3.5" disabled={!valid} onClick={() => onConfirm(n)}><Check size={16} />{t('Preso: aggiungi alla dispensa')}</button>}>
+      <p className="text-sm text-muted">{buying ? t('Servono {qty}. Quanto ne hai preso?', { qty: formatQuantity(buying.total, buying.unit) }) : ''}</p>
+      <label className="label">{t('Quantità presa ({unit})', { unit: buying?.unit ?? '' })}</label>
+      <input className="field" inputMode="decimal" autoFocus value={qty} onChange={(e) => setQty(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && valid && onConfirm(n)} aria-label={t('Quantità presa')} />
+      <button className="mt-3 text-sm font-semibold text-brand" onClick={() => onConfirm(null)}>{t('Spunta senza aggiungere alla dispensa')}</button>
+    </Sheet>
   )
 }
 

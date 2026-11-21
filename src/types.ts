@@ -39,6 +39,15 @@ export interface FoodCatalogItem extends Versioned {
   category: FoodCategory
   /** sinonimi che l'import / l'autocompletamento associano a questo alimento */
   aliases?: string[]
+  /** varianti: altri alimenti del catalogo che lo sostituiscono con un fattore di conversione */
+  variants?: FoodVariant[]
+}
+
+/** «`amount` di questo alimento = `variantAmount` dell'alimento `foodId`» (es. 100 g di pasta = 120 g di riso), ognuno nella propria unità del catalogo. */
+export interface FoodVariant {
+  foodId: string
+  amount: number
+  variantAmount: number
 }
 
 export interface MealItem {
@@ -84,6 +93,52 @@ export interface ShoppingCheckState {
   resetAt: string
 }
 
+/** Acquisto in dispensa: nasce dalla spunta di una riga della spesa (chiave `${lineKey}|${resetAt}`), si annulla togliendo la spunta. */
+export interface PantryPurchase extends Versioned {
+  key: string
+  foodId: string
+  /** unità base (g, ml, pz …) */
+  unit: string
+  quantity: number
+}
+
+/** Correzione manuale della dispensa (quantità con segno). */
+export interface PantryAdjustment extends Versioned {
+  id: string
+  foodId: string
+  unit: string
+  quantity: number
+}
+
+export interface ConsumedItem {
+  foodId: string
+  unit: string
+  quantity: number
+}
+
+/** Pasto segnato come completato in una data precisa; conserva cosa è stato scalato dalla dispensa (per poterlo annullare). */
+export interface MealLog extends Versioned {
+  /** `${memberId}|${YYYY-MM-DD}|${mealId}` */
+  key: string
+  memberId: string
+  date: string
+  mealId: string
+  done: boolean
+  consumed: ConsumedItem[]
+  /** alimenti che non erano (abbastanza) in dispensa */
+  missing?: number
+}
+
+/**
+ * La dispensa non è una quantità memorizzata ma un registro: giacenza = acquisti + correzioni − pasti completati.
+ * Così due dispositivi che lavorano insieme non si sovrascrivono (ogni record ha chiave propria).
+ */
+export interface PantryState {
+  purchases: Record<string, PantryPurchase>
+  adjustments: Record<string, PantryAdjustment>
+  meals: Record<string, MealLog>
+}
+
 export interface AppDatabase {
   schema: 'meal-duo-db'
   version: 1
@@ -92,6 +147,7 @@ export interface AppDatabase {
   foodCatalog: FoodCatalogItem[]
   plans: Record<string, WeeklyPlan>
   shopping: ShoppingCheckState
+  pantry: PantryState
   lastUpdated: string
 }
 

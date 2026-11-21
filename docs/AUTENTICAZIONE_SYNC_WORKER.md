@@ -157,6 +157,18 @@ Il proprietario: `Membri → Modifica → Rimuovi membro` → `drive.removeShare
 
 ---
 
+## 5c. Varianti, pasti completati e dispensa
+
+**Varianti.** In *Impostazioni → Catalogo alimenti → alimento → Varianti* si dichiara che un alimento ne sostituisce un altro con un fattore di conversione: «100 g di pasta = 120 g di riso». Vale nei due sensi (si dichiara su un solo alimento) e solo tra unità confrontabili (g/kg, ml/l, pz). Nella scheda di un alimento di un pasto compare «Sostituisci con una variante»: un tocco cambia alimento e quantità (si salva con *Salva*).
+
+**Pasto completato.** In *Oggi* ogni pasto ha una spunta: completandolo, gli alimenti vengono scalati dalla dispensa; riaprendolo vengono rimessi. La spunta vale per quella data (il giorno scelto della settimana corrente) e per quel membro, quindi il piano settimanale resta un modello che si ripete.
+
+**Dispensa.** In *Spesa → Dispensa*. Si riempie spuntando un articolo della lista: l'app chiede quanto ne hai preso (di norma quanto serve) e lo aggiunge; togliendo la spunta si toglie. «Nuova spesa» azzera le spunte ma non la dispensa. Si svuota completando i pasti: se manca l'alimento ma in dispensa c'è una sua variante, si scala quella (convertita); ciò che non c'è non viene scalato e l'app lo segnala. Le quantità si correggono a mano (tocco sulla riga) e si possono aggiungere alimenti col pulsante +. La lista della spesa **non** sottrae la dispensa.
+
+**Come è salvata.** La dispensa non è una quantità ma un registro nel database (`pantry`): acquisti (chiave `riga|resetAt`), correzioni e pasti completati, ognuno con la propria chiave e con il merge last-write-wins per record. La giacenza si calcola (acquisti + correzioni − pasti completati), quindi due dispositivi che lavorano insieme non si sovrascrivono e la stessa spunta su due telefoni conta una volta. Chi usa ancora una versione vecchia dell'app non conosce questi campi: finché non si aggiorna può ometterli quando scrive.
+
+---
+
 ## 6. Notifiche
 
 ### 6.1 Cosa e a chi

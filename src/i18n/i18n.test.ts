@@ -44,7 +44,7 @@ describe('traduzioni in inglese', () => {
     const { FOOD_CATEGORIES } = await import('../lib/foodMatch')
     const dynamic = new Set([...FOOD_CATEGORIES, 'Oggi', 'Settimana', 'Spesa', 'Impostazioni', 'Mochi (Chiaro)', 'Zenitsu (Scuro)', 'Automatico', 'Locale', 'Da inviare', 'Sync…', 'Sincronizzato', 'Offline', 'Errore', 'Accedi', 'Non collegato', 'Riconnessione necessaria', 'Da sincronizzare', 'Sincronizzazione…', 'Spuntino serale', 'Pre-workout', 'Post-workout',
       // scelte con un ternario dentro t(cond ? 'a' : 'b'): la regex non le vede come letterali
-      'Sincronizzazione: {s}. Tocca per collegare Google Drive', 'Sincronizzazione: {s}. Tocca per sincronizzare', '{name}: da comprare', '{name}: preso', '{n} usi', '{n} uso',
+      'Sincronizzazione: {s}. Tocca per collegare Google Drive', 'Sincronizzazione: {s}. Tocca per sincronizzare', '{name}: da comprare', '{name}: preso', '{name}: completato', '{name}: da completare', '{n} usi', '{n} uso',
       // descrizioni dei temi (array di oggetti letti con t(o.hint))
       'Chiara, crema e arancio come il gatto bianco e arancione', 'Scura, ardesia come il gatto grigio scuro', 'Segue la modalità del telefono'])
     const used = new Set(usedKeys())

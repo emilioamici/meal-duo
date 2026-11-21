@@ -1,5 +1,5 @@
 /** Validazione/normalizzazione difensiva di un database letto da Drive o da localStorage. */
-import type { AppDatabase, DayPlan, FoodCategory, Meal, WeeklyPlan } from '../types'
+import type { AppDatabase, DayPlan, FoodCategory, FoodVariant, Meal, PantryState, WeeklyPlan } from '../types'
 import { DAY_INDEXES } from '../types'
 import { EPOCH, emptyDay } from './dbOps'
 import { FOOD_CATEGORIES } from '../lib/foodMatch'
@@ -9,6 +9,41 @@ const isObj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 
 const str = (v: unknown, d = ''): string => (typeof v === 'string' ? v : d)
 const by = (v: unknown): string | undefined => (typeof v === 'string' && v ? v : undefined)
 const iso = (v: unknown): string => (typeof v === 'string' && !Number.isNaN(Date.parse(v)) ? v : EPOCH)
+
+const num = (v: unknown): number | undefined => (typeof v === 'number' && Number.isFinite(v) && v > 0 ? v : undefined)
+
+function parseVariants(v: unknown): FoodVariant[] | undefined {
+  if (!Array.isArray(v)) return undefined
+  const out = v.filter(isObj).flatMap((x) => {
+    const amount = num(x.amount), variantAmount = num(x.variantAmount)
+    return typeof x.foodId === 'string' && x.foodId && amount && variantAmount ? [{ foodId: x.foodId, amount, variantAmount }] : []
+  })
+  return out.length ? out : undefined
+}
+
+function parsePantry(raw: unknown): PantryState {
+  const p = isObj(raw) ? raw : {}
+  const rec = (v: unknown) => (isObj(v) ? Object.entries(v).filter((e): e is [string, Record<string, unknown>] => isObj(e[1])) : [])
+  const base = (o: Record<string, unknown>) => ({ by: by(o.by), updatedAt: iso(o.updatedAt), deleted: o.deleted === true ? true : undefined })
+  const purchases: PantryState['purchases'] = {}
+  for (const [k, o] of rec(p.purchases)) {
+    const quantity = num(o.quantity)
+    if (typeof o.foodId === 'string' && o.foodId && quantity) purchases[k] = { key: k, foodId: o.foodId, unit: str(o.unit, 'g'), quantity, ...base(o) }
+  }
+  const adjustments: PantryState['adjustments'] = {}
+  for (const [k, o] of rec(p.adjustments)) {
+    if (typeof o.foodId === 'string' && o.foodId && typeof o.quantity === 'number' && Number.isFinite(o.quantity)) adjustments[k] = { id: k, foodId: o.foodId, unit: str(o.unit, 'g'), quantity: o.quantity, ...base(o) }
+  }
+  const meals: PantryState['meals'] = {}
+  for (const [k, o] of rec(p.meals)) {
+    const consumed = (Array.isArray(o.consumed) ? o.consumed : []).filter(isObj).flatMap((c) => {
+      const quantity = num(c.quantity)
+      return typeof c.foodId === 'string' && c.foodId && quantity ? [{ foodId: c.foodId, unit: str(c.unit, 'g'), quantity }] : []
+    })
+    meals[k] = { key: k, memberId: str(o.memberId), date: str(o.date), mealId: str(o.mealId), done: o.done === true, consumed, missing: typeof o.missing === 'number' && o.missing > 0 ? o.missing : undefined, ...base(o) }
+  }
+  return { purchases, adjustments, meals }
+}
 
 export function parseDb(raw: unknown): AppDatabase {
   if (!isObj(raw) || raw.schema !== 'meal-duo-db') throw new Error('Il file non è un database Meal Duo valido.')
@@ -30,6 +65,7 @@ export function parseDb(raw: unknown): AppDatabase {
     unit: str(f.unit, 'g'),
     category: (FOOD_CATEGORIES.includes(f.category as FoodCategory) ? f.category : 'Surgelati e altro') as FoodCategory,
     aliases: Array.isArray(f.aliases) ? f.aliases.filter((a): a is string => typeof a === 'string') : undefined,
+    variants: parseVariants(f.variants),
     by: by(f.by),
     updatedAt: iso(f.updatedAt),
     deleted: f.deleted === true ? true : undefined,
@@ -84,6 +120,7 @@ export function parseDb(raw: unknown): AppDatabase {
     foodCatalog,
     plans,
     shopping: { checks, extras, resetAt: iso(sh.resetAt) },
+    pantry: parsePantry(raw.pantry),
     lastUpdated: iso(raw.lastUpdated),
   }
 }

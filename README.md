@@ -21,7 +21,7 @@
 2. [Struttura del progetto](#2-struttura-del-progetto)
 3. [Setup Google Cloud Console](#3-setup-google-cloud-console-client-id--drive-api)
 4. [Accesso, condivisione e inviti](#4-accesso-condivisione-e-inviti)
-5. [Sincronizzazione, offline e conflitti](#5-sincronizzazione-offline-e-conflitti) · [Worker e notifiche push](#5b-worker-e-notifiche-push-facoltativo)
+5. [Sincronizzazione, offline e conflitti](#5-sincronizzazione-offline-e-conflitti) · [Worker e notifiche push](#5b-worker-e-notifiche-push-facoltativo) · [Varianti, pasti e dispensa](#5c-varianti-pasti-completati-e-dispensa)
 6. [Import / export del piano in JSON](#6-import--export-del-piano-in-json)
 7. [Deploy su GitHub Pages](#7-deploy-su-github-pages)
 8. [Icona dell'app](#8-icona-dellapp)
@@ -202,6 +202,18 @@ Installazione passo passo: **`worker/README.md`**. In breve: `node worker/script
 | Modifica del **tuo** piano da parte di un altro | «Emilio ha modificato il tuo piano · Martedì» |
 
 Ogni notifica compare nella **campanella** dell'app (anche senza Worker, ricevuta alla sync), come avviso del telefono se l'app è in background e, con il Worker, come push ad app chiusa. Le notifiche push partono **dopo** che i dati sono arrivati su Drive (coda locale che sopravvive a offline e riavvii, scarto dopo 24 h o se la voce è stata eliminata); le spunte dello stesso autore **sostituiscono** la precedente (stesso `tag`). Si attivano da **Impostazioni → Notifiche**. Su iPhone servono iOS 16.4+ e l'app aggiunta alla Home.
+
+---
+
+## 5c. Varianti, pasti completati e dispensa
+
+**Varianti.** In *Impostazioni → Catalogo alimenti → alimento → Varianti* si dichiara che un alimento ne sostituisce un altro con un fattore di conversione: «100 g di pasta = 120 g di riso». Vale nei due sensi (si dichiara su un solo alimento) e solo tra unità confrontabili (g/kg, ml/l, pz). Nella scheda di un alimento di un pasto compare «Sostituisci con una variante»: un tocco cambia alimento e quantità (si salva con *Salva*).
+
+**Pasto completato.** In *Oggi* ogni pasto ha una spunta: completandolo, gli alimenti vengono scalati dalla dispensa; riaprendolo vengono rimessi. La spunta vale per quella data (il giorno scelto della settimana corrente) e per quel membro, quindi il piano settimanale resta un modello che si ripete.
+
+**Dispensa.** In *Spesa → Dispensa*. Si riempie spuntando un articolo della lista: l'app chiede quanto ne hai preso (di norma quanto serve) e lo aggiunge; togliendo la spunta si toglie. «Nuova spesa» azzera le spunte ma non la dispensa. Si svuota completando i pasti: se manca l'alimento ma in dispensa c'è una sua variante, si scala quella (convertita); ciò che non c'è non viene scalato e l'app lo segnala. Le quantità si correggono a mano (tocco sulla riga) e si possono aggiungere alimenti col pulsante +. La lista della spesa **non** sottrae la dispensa.
+
+**Come è salvata.** La dispensa non è una quantità ma un registro nel database (`pantry`): acquisti (chiave `riga|resetAt`), correzioni e pasti completati, ognuno con la propria chiave e con il merge last-write-wins per record. La giacenza si calcola (acquisti + correzioni − pasti completati), quindi due dispositivi che lavorano insieme non si sovrascrivono e la stessa spunta su due telefoni conta una volta. Chi usa ancora una versione vecchia dell'app non conosce questi campi: finché non si aggiorna può ometterli quando scrive.
 
 ---
 
