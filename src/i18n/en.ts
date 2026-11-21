@@ -422,4 +422,5 @@ export const EN: Record<string, string> = {
   "«{name}» completato · {n} alimenti non erano in dispensa": "“{name}” completed · {n} foods were not in the pantry",
   "{name}: completato": "{name}: completed",
   "{name}: da completare": "{name}: to complete",
+  "In dispensa: {qty}": "In the pantry: {qty}",
 }

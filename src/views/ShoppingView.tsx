@@ -10,7 +10,7 @@ import { DAY_INDEXES, type DayIndex, type ExtraItem, type Member, type ShoppingL
 import { buildShoppingList, extraChecked, groupByCategory, liveExtras, shoppingProgress } from '../services/shoppingListEngine'
 import { addExtra, checkLine, removeExtra, resetShopping, toggleExtra, uncheckLine } from '../services/dbOps'
 import { PantryPanel } from '../components/PantryPanel'
-import { formatCompact, formatQuantity } from '../lib/units'
+import { formatCompact, formatQuantity, round2 } from '../lib/units'
 import { t, dayShort, tp } from '../i18n'
 
 export function ShoppingView() {
@@ -129,6 +129,7 @@ export function ShoppingView() {
                           <span className={`min-w-0 truncate font-semibold leading-tight ${l.checked ? 'line-through' : ''}`}>{l.name}</span>
                           <span className="shrink-0 font-extrabold">{formatQuantity(l.total, l.unit)}</span>
                         </div>
+                        {l.inPantry > 0 && <p className="mt-1 text-xs font-semibold text-muted">{t('In dispensa: {qty}', { qty: formatQuantity(l.inPantry, l.unit) })}</p>}
                         <div className="mt-1.5 flex flex-wrap gap-1.5">
                           {l.perMember.map((p) => <MemberBadge key={p.memberId} member={memberMap.get(p.memberId)} text={formatCompact(p.quantity, l.unit)} />)}
                         </div>
@@ -190,14 +191,14 @@ function CheckButton({ checked, label, onClick }: { checked: boolean; label: str
 function BuySheet({ buying, onClose, onConfirm }: { buying: ShoppingLine | null; onClose: () => void; onConfirm: (quantity: number | null) => void }) {
   const [seed, setSeed] = useState('')
   const [qty, setQty] = useState('')
-  if (buying && seed !== buying.key) { setSeed(buying.key); setQty(String(buying.total)) }
+  if (buying && seed !== buying.key) { setSeed(buying.key); setQty(String(buying.inPantry > 0 && buying.total > buying.inPantry ? round2(buying.total - buying.inPantry) : buying.total)) } // quanto manca, se in casa ce n'è già un po'
   if (!buying && seed) setSeed('')
   const n = Number(qty.replace(',', '.'))
   const valid = qty.trim() !== '' && Number.isFinite(n) && n > 0
   return (
     <Sheet open={!!buying} onClose={onClose} title={buying?.name ?? ''}
       footer={<button className="glass-btn btn-primary w-full !py-3.5" disabled={!valid} onClick={() => onConfirm(n)}><Check size={16} />{t('Preso: aggiungi alla dispensa')}</button>}>
-      <p className="text-sm text-muted">{buying ? t('Servono {qty}. Quanto ne hai preso?', { qty: formatQuantity(buying.total, buying.unit) }) : ''}</p>
+      <p className="text-sm text-muted">{buying ? t('Servono {qty}. Quanto ne hai preso?', { qty: formatQuantity(buying.total, buying.unit) }) + (buying.inPantry > 0 ? ' ' + t('In dispensa: {qty}', { qty: formatQuantity(buying.inPantry, buying.unit) }) : '') : ''}</p>
       <label className="label">{t('Quantità presa ({unit})', { unit: buying?.unit ?? '' })}</label>
       <input className="field" inputMode="decimal" autoFocus value={qty} onChange={(e) => setQty(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && valid && onConfirm(n)} aria-label={t('Quantità presa')} />
       <button className="mt-3 text-sm font-semibold text-brand" onClick={() => onConfirm(null)}>{t('Spunta senza aggiungere alla dispensa')}</button>
