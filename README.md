@@ -252,6 +252,7 @@ Formato (`meal-duo-plan` v1):
 }
 ```
 
+- **Varianti degli alimenti** (facoltative): `"variants": [ { "from": { "name": "Pasta", "quantity": 100, "unit": "g" }, "to": { "name": "Riso", "quantity": 120, "unit": "g" } } ]` significa «100 g di pasta = 120 g di riso» e vale nei due sensi. Le unità devono essere confrontabili tra loro (g/kg, ml/l, pz); possono essere diverse da quelle del catalogo, il fattore viene salvato nell'unità di ciascun alimento (se l'unità non è confrontabile con quella del catalogo la variante viene saltata e l'anteprima lo dice). I nomi si associano al catalogo come per gli alimenti del piano (i mancanti vengono creati). Le varianti sono del catalogo condiviso, non del membro: valgono per tutta la famiglia. Si possono importare **anche da sole** (file senza `days`): il piano del membro non viene toccato. L'esportazione le include tutte; il tracciato di esempio ne contiene una.
 - `days` può essere un array (`day`: «Lunedì», «lun», «monday»…) oppure un oggetto indicizzato per nome del giorno. I giorni mancanti restano vuoti.
 - `quantity`: numero > 0 (accetta anche `"1,5"`). `unit`: `g`, `kg`, `ml`, `l`, `pz`, `cucchiaio`… (se manca → `g` con avviso).
 - Gli errori indicano il percorso preciso (`days[2].meals[1].items[0]: …`).
