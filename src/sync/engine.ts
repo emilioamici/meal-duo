@@ -10,6 +10,8 @@ import { DB_FILE_NAME, DriveError } from './drive'
 import { GoogleAuthError, cachedToken, clearToken, requestToken, revokeToken, setToken, tokenRemainingMs, type Prompt } from './google'
 import { SessionExpired, brokerAvailable, hasSession, logoutBroker, refreshAccessToken, startBrokerLogin } from './auth'
 import { pickDatabase, pickFolder, pickerConfigured, type Picked } from './picker'
+import { ConflictError, bridgeAvailable, bridgeMeta, bridgeRead, bridgeWrite, myFamilies, registerFamily } from './bridge'
+import { inviteLink } from './invite'
 
 /**
  * Motore di sincronizzazione con un file JSON su Google Drive (stessa architettura di MoneyDuo).
@@ -42,6 +44,8 @@ interface Persisted {
   remoteVersion: string | null
   lastSyncAt: string | null
   dirty: boolean
+  /** la famiglia si apre dal ponte del Worker (invitato senza accesso diretto al file) */
+  bridged: boolean
 }
 
 export type SyncStatus = 'off' | 'auth' | 'pending' | 'syncing' | 'synced' | 'offline' | 'error'
@@ -65,7 +69,7 @@ export interface SyncHost {
   afterSync?: () => void
 }
 
-const EMPTY: Persisted = { fileId: null, fileName: null, email: null, name: null, ownerEmail: null, canShare: false, remoteVersion: null, lastSyncAt: null, dirty: false }
+const EMPTY: Persisted = { fileId: null, fileName: null, email: null, name: null, ownerEmail: null, canShare: false, remoteVersion: null, lastSyncAt: null, dirty: false, bridged: false }
 
 function loadPersisted(): Persisted {
   try {
@@ -79,6 +83,14 @@ const envClientId = (): string => (import.meta.env.VITE_GOOGLE_CLIENT_ID as stri
 function loadClientId(): string {
   try { return localStorage.getItem(CLIENT_KEY) || envClientId() } catch { return envClientId() }
 }
+
+/** Nessun accesso al file né dal ponte: se il Picker è configurato basta un tocco (ristretto a quel file) per concedere il permesso. */
+export class NeedsPickerError extends Error {}
+export interface ResolvedFamily { file: drive.DriveFile; remote: Db; bridged: boolean }
+export interface FamilyChoice { id: string; name: string; modifiedTime: string; bridged: boolean }
+
+const REGISTER_EVERY_MS = 3 * 24 * 3600 * 1000
+const regKey = (id: string) => `mealduo:bridgeReg:${id}`
 
 export class SyncEngine {
   private p: Persisted = loadPersisted()
@@ -263,13 +275,22 @@ export class SyncEngine {
     this.rebuild()
   }
 
+  /** File con «meal-duo» nel nome visibili all'app (accesso diretto). */
   async listCandidates(): Promise<drive.DriveFile[]> {
     return drive.listCandidates(await this.token())
   }
 
+  /** Famiglie che l'account può aprire: quelle con accesso diretto (create da qui) e quelle a cui è stato invitato, aperte dal ponte del Worker. */
+  async listFamilies(): Promise<FamilyChoice[]> {
+    const token = await this.token()
+    const out: FamilyChoice[] = (await drive.listCandidates(token)).filter(drive.isDatabaseFile).map((f) => ({ id: f.id, name: f.name, modifiedTime: f.modifiedTime, bridged: false }))
+    for (const h of await myFamilies(token)) if (!out.some((o) => o.id === h.id)) out.push({ ...h, bridged: true })
+    return out
+  }
+
   /**
    * Crea la famiglia: un nuovo database nel Drive di chi lo crea (proprietario). Se sul dispositivo ci sono già dati propri
-   * (non i dati demo) li tiene e gli dà solo il nome.
+   * (non i dati demo) li tiene e gli dà solo il nome. Poi la affida al ponte del Worker, se c'è l'accesso persistente.
    */
   async createHouse(opts: { houseName: string; memberName: string; folderId: string | null; keepLocal: boolean }): Promise<void> {
     const token = await this.token()
@@ -282,75 +303,121 @@ export class SyncEngine {
     const f = await drive.createFile(token, JSON.stringify(db), DB_FILE_NAME, opts.folderId)
     this.host!.applyDb((prev) => (keep ? { ...mergeDatabases(prev, db) } : db), false)
     this.reconciled = true
-    this.p = { ...this.p, fileId: f.id, fileName: f.name, ownerEmail: this.p.email, canShare: true, remoteVersion: f.version, lastSyncAt: nowIso(), dirty: false }
+    this.p = { ...this.p, fileId: f.id, fileName: f.name, ownerEmail: this.p.email, canShare: true, bridged: false, remoteVersion: f.version, lastSyncAt: nowIso(), dirty: false }
     this.persist()
     this.set('synced')
+    void this.registerBridge(true)
   }
 
-  /** Scarica e valida un file Drive (senza ancora collegarlo). */
-  async inspect(fileId: string): Promise<{ file: drive.DriveFile; remote: Db }> {
+  /** Scarica e valida un file (senza ancora collegarlo): da Drive, oppure dal ponte del Worker. */
+  async inspect(fileId: string, bridged = false): Promise<{ file: drive.DriveFile; remote: Db }> {
     const token = await this.token()
+    if (bridged) { const r = await bridgeRead(token, fileId); return { file: r.meta, remote: r.db } }
     const file = await drive.getMeta(token, fileId)
     const remote = parseDb(await drive.download(token, fileId))
     return { file, remote }
   }
 
+  /**
+   * Apre una famiglia dal suo ID (o dal link d'invito), come in Clean Duo: accesso diretto al file → ponte del Worker (nessun
+   * Selettore, nessun ID da inserire) → Selettore di Google ristretto a quel file (un tocco, `picker: true`: serve un gesto).
+   * `NeedsPickerError` = serve il tocco sul Picker.
+   */
+  async resolveFamily(input: string, picker = false): Promise<ResolvedFamily> {
+    const id = drive.parseFileId(input)
+    if (!id) throw new Error(t('ID famiglia non valido.'))
+    const noAccess = (e: unknown): e is DriveError => e instanceof DriveError && (e.status === 404 || e.status === 403)
+    try { return { ...(await this.inspect(id)), bridged: false } } catch (e) { if (!noAccess(e)) throw e }
+    let bridgeMsg = ''
+    if (await bridgeAvailable()) {
+      try { return { ...(await this.inspect(id, true)), bridged: true } } catch (e) { if (!noAccess(e)) throw e; bridgeMsg = e.message }
+    }
+    if (!pickerConfigured()) throw new Error(bridgeMsg || t('Non riesco ad aprire la famiglia: controlla l\'ID e che ti abbia invitato con questo account Google.'))
+    if (!picker) throw new NeedsPickerError()
+    const f = await pickDatabase(await this.token(), id)
+    if (!f) throw new NeedsPickerError()
+    if (f.id !== id) throw new Error(t('Hai scelto un file diverso da quello dell\'invito.'))
+    return { ...(await this.inspect(id)), bridged: false }
+  }
+
   /** Collega un file esistente: `merge` unisce i dati locali, `replace` usa solo il file. */
-  async link(file: drive.DriveFile, remote: Db, mode: 'merge' | 'replace'): Promise<void> {
+  async link(file: drive.DriveFile, remote: Db, mode: 'merge' | 'replace', bridged = false): Promise<void> {
     this.host!.applyDb((prev) => (mode === 'merge' ? mergeDatabases(prev, remote) : remote), false)
     this.reconciled = true
-    this.p = { ...this.p, fileId: file.id, fileName: file.name, ownerEmail: file.owners?.[0]?.emailAddress ?? null, canShare: !!(file.ownedByMe || file.capabilities?.canShare), remoteVersion: file.version, lastSyncAt: nowIso(), dirty: mode === 'merge' }
+    this.p = { ...this.p, fileId: file.id, fileName: file.name, ownerEmail: file.owners?.[0]?.emailAddress ?? null, canShare: !bridged && !!(file.ownedByMe || file.capabilities?.canShare), bridged, remoteVersion: file.version, lastSyncAt: nowIso(), dirty: mode === 'merge' }
     this.persist()
     this.set(mode === 'merge' ? 'pending' : 'synced')
     if (mode === 'merge') void this.syncNow()
+    else void this.registerBridge()
   }
 
   unlink(): void {
-    this.p = { ...this.p, fileId: null, fileName: null, remoteVersion: null, dirty: false, lastSyncAt: null }
+    this.p = { ...this.p, fileId: null, fileName: null, remoteVersion: null, dirty: false, lastSyncAt: null, bridged: false }
     this.persist()
     this.set('off')
   }
 
-  /** Invita un account Google: concede l'accesso in modifica al file (solo il proprietario). */
+  /** Le azioni sul file su Drive (inviti, cartella) le fa chi ha creato la famiglia: chi entra dal ponte non può. */
+  private requireDirect(): void {
+    if (this.p.bridged) throw new Error(t('Solo chi ha creato la famiglia può farlo.'))
+  }
+
+  /**
+   * Chi ha creato la famiglia la affida al ponte del Worker (serve l'accesso persistente): gli invitati entrano senza Selettore né ID.
+   * Si ripete ogni 3 giorni; `force` (dopo un invito) non aspetta: l'elenco degli invitati si aggiorna solo a ogni registrazione.
+   */
+  async registerBridge(force = false): Promise<boolean> {
+    const id = this.p.fileId
+    if (!id || this.p.bridged || !this.p.canShare || !hasSession()) return false
+    let last = 0
+    try { last = Number(localStorage.getItem(regKey(id))) || 0 } catch { /* noop */ }
+    if (!force && Date.now() - last < REGISTER_EVERY_MS) return false
+    const tk = cachedToken()
+    if (!tk) return false
+    const ok = await registerFamily(id, tk)
+    if (ok) { try { localStorage.setItem(regKey(id), String(Date.now())) } catch { /* noop */ } }
+    return ok
+  }
+
+  /** Invita un account Google: concede l'accesso in modifica al file (solo il proprietario). L'email contiene il link d'invito. */
   async invite(email: string, houseName: string): Promise<void> {
     if (!this.p.fileId) return
-    await drive.shareFile(await this.token(), this.p.fileId, email.trim(), t('Ti invito nella famiglia «{name}» su Meal Duo. Apri l\'app, accedi con questo account Google e scegli il database condiviso.', { name: houseName }))
+    this.requireDirect()
+    await drive.shareFile(await this.token(), this.p.fileId, email.trim(), t('Ti invito nella famiglia «{name}» su Meal Duo. Apri questo link e accedi con questo account Google: la famiglia si apre da sola. {link}', { name: houseName, link: inviteLink(this.p.fileId) }))
+    void this.registerBridge(true)
   }
 
   /** Revoca l'accesso al file a un account. false se non aveva permessi. */
   async revoke(email: string): Promise<boolean> {
     if (!this.p.fileId) return false
+    this.requireDirect()
     return drive.removeShare(await this.token(), this.p.fileId, email.trim())
   }
 
-  /** Nome della cartella che contiene il file (null se non visibile, es. file condiviso da altri). */
+  /** Nome della cartella che contiene il file (null se non visibile: file aperto dal ponte o condiviso da altri). */
   async currentFolder(): Promise<{ id: string; name: string } | null> {
-    if (!this.p.fileId) return null
+    if (!this.p.fileId || this.p.bridged) return null
     const token = await this.token()
     const meta = await drive.getMeta(token, this.p.fileId)
     const id = meta.parents?.[0]
     return id ? { id, name: await drive.folderName(token, id).catch(() => t('Cartella')) } : null
   }
-  async listFolders(parentId: string): Promise<drive.DriveFolder[]> {
-    return drive.listFolders(await this.token(), parentId)
-  }
-  async createFolder(name: string, parentId: string): Promise<drive.DriveFolder> {
-    return drive.createFolder(await this.token(), name, parentId)
-  }
-  /** Sposta il database in un'altra cartella (solo il proprietario). */
+  /** Sposta il database in un'altra cartella scelta con il Picker (solo il proprietario). */
   async moveTo(folderId: string): Promise<void> {
     if (!this.p.fileId) return
+    this.requireDirect()
     const token = await this.token()
     const meta = await drive.getMeta(token, this.p.fileId)
     await drive.moveFile(token, this.p.fileId, folderId, meta.parents ?? [])
   }
 
-  /** Selettore di Google: il database della famiglia (anche condiviso da altri). Solo con il permesso `drive.file`. */
-  async pickDatabase(): Promise<Picked | null> {
-    return pickDatabase(await this.token())
+  /** Selettore di Google: il database della famiglia (anche condiviso da altri). */
+  async pickDatabase(onlyFileId?: string): Promise<Picked | null> {
+    return pickDatabase(await this.token(), onlyFileId)
   }
   /** Selettore di Google: una cartella del proprio Drive. */
   async pickFolder(): Promise<Picked | null> {
+    this.requireDirect()
     return pickFolder(await this.token())
   }
 
@@ -382,16 +449,20 @@ export class SyncEngine {
     try {
       const id = this.p.fileId
       for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
-        const meta = await drive.getMeta(token, id)
-        const owner = meta.owners?.[0]?.emailAddress ?? this.p.ownerEmail
-        const canShare = !!(meta.ownedByMe || meta.capabilities?.canShare)
-        if (owner !== this.p.ownerEmail || canShare !== this.p.canShare) { this.p.ownerEmail = owner; this.p.canShare = canShare; this.persist() }
-        if (meta.capabilities?.canEdit === false && this.p.dirty) throw new Error(t('Non hai i permessi di scrittura sul file: chiedi il ruolo «Editor».'))
+        const bridged = this.p.bridged
+        const meta = bridged ? await bridgeMeta(token, id) : await drive.getMeta(token, id)
+        if (!bridged) {
+          // dal ponte i metadati non includono proprietario e permessi: restano quelli noti (e chi entra dal ponte non può invitare)
+          const owner = meta.owners?.[0]?.emailAddress ?? this.p.ownerEmail
+          const canShare = !!(meta.ownedByMe || meta.capabilities?.canShare)
+          if (owner !== this.p.ownerEmail || canShare !== this.p.canShare) { this.p.ownerEmail = owner; this.p.canShare = canShare; this.persist() }
+          if (meta.capabilities?.canEdit === false && this.p.dirty) throw new Error(t('Non hai i permessi di scrittura sul file: chiedi il ruolo «Editor».'))
+        }
         let needPush = this.p.dirty
 
         // si legge Drive se la versione è cambiata OPPURE se la copia locale non è affidabile (versione dimenticata)
         if (this.p.remoteVersion === null || meta.version !== this.p.remoteVersion) {
-          const remote = parseDb(await drive.download(token, id))
+          const remote = bridged ? (await bridgeRead(token, id)).db : parseDb(await drive.download(token, id))
           if (this.pullMode === 'replace') {
             this.host.applyDb(() => remote, false) // copia persa: si adotta Drive così com'è (senza notifiche)
           } else {
@@ -407,11 +478,20 @@ export class SyncEngine {
 
         let version = meta.version
         if (needPush) {
-          // ricontrollo subito prima di scrivere: se qualcuno ha scritto nel frattempo, si rifà il merge (evita la race GET→PATCH)
-          const check = await drive.getMeta(token, id)
-          if (check.version !== meta.version) { this.p.remoteVersion = null; continue }
           const seq = this.dirtySeq
-          const f = await drive.updateFile(token, id, JSON.stringify(this.host.getDb()))
+          let f: drive.DriveFile
+          if (bridged) {
+            // il Worker scrive solo se la versione coincide (409 altrimenti): si rifà il merge e si riprova
+            try { f = await bridgeWrite(token, id, this.host.getDb(), meta.version) } catch (e) {
+              if (e instanceof ConflictError) { this.p.remoteVersion = null; continue }
+              throw e
+            }
+          } else {
+            // ricontrollo subito prima di scrivere: se qualcuno ha scritto nel frattempo, si rifà il merge (evita la race GET→PATCH)
+            const check = await drive.getMeta(token, id)
+            if (check.version !== meta.version) { this.p.remoteVersion = null; continue }
+            f = await drive.updateFile(token, id, JSON.stringify(this.host.getDb()))
+          }
           version = f.version
           // se nel frattempo ci sono state altre modifiche locali, restano "dirty" per il ciclo successivo
           this.p.dirty = this.dirtySeq !== seq
@@ -422,6 +502,7 @@ export class SyncEngine {
         this.set(this.p.dirty ? 'pending' : 'synced')
         if (this.p.dirty) this.debounce = setTimeout(() => void this.syncNow(), 1000)
         else this.host.afterSync?.()
+        void this.registerBridge()
         return
       }
       throw new Error(t('Il database viene modificato di continuo da un altro dispositivo: riprovo tra poco.'))
@@ -442,6 +523,7 @@ export class SyncEngine {
       return this.set('auth', t('Sessione Google scaduta: riconnettiti per continuare a sincronizzare.'))
     }
     if (e instanceof DriveError) {
+      if (e.status === 404 && this.p.bridged) return this.set('error', e.message || t('Non hai più accesso alla famiglia: chi l\'ha creata ti ha tolto l\'invito o deve riaprire l\'app.'))
       if (e.status === 404 && pickerConfigured()) return this.set('error', t('Non riesco ad aprire il database: scegli di nuovo il file con il selettore di Google (Impostazioni → Sincronizzazione e account). Se non lo vedi, forse sei stato rimosso dalla famiglia o il file è stato spostato.'))
       if (e.status === 404) return this.set('error', t('Non hai più accesso al database: forse sei stato rimosso dalla famiglia o il file è stato spostato. Puoi scollegarti dalle Impostazioni.'))
       if (e.status === 403) return this.set('error', t('Permesso negato: serve l\'accesso in modifica al file.') + ' ' + e.message)

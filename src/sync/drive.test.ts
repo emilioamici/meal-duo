@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { createFile, createFolder, isDatabaseFile, listCandidates, listFolders, moveFile, parseFileId, removeShare, shareFile, updateFile } from './drive'
+import { createFile, isDatabaseFile, listCandidates, moveFile, parseFileId, removeShare, shareFile, updateFile } from './drive'
 
 type Call = { url: string; method: string; body?: string }
 const calls: Call[] = []
@@ -15,24 +15,7 @@ beforeEach(() => {
 })
 afterEach(() => vi.unstubAllGlobals())
 
-describe('Drive: cartelle e spostamento', () => {
-  it('listFolders: solo cartelle del padre indicato, non cestinate; segue la paginazione', async () => {
-    responses = [{ files: [{ id: 'a', name: 'A' }], nextPageToken: 'p2' }, { files: [{ id: 'b', name: 'B' }] }]
-    const out = await listFolders('tok', 'root')
-    expect(out.map((f) => f.id)).toEqual(['a', 'b'])
-    const q = decodeURIComponent(calls[0].url)
-    expect(q).toContain("mimeType = 'application/vnd.google-apps.folder'")
-    expect(q).toContain("'root' in parents")
-    expect(q).toContain('trashed = false')
-    expect(calls[1].url).toContain('pageToken=p2')
-  })
-  it('createFolder: nella radice non manda parents; altrimenti sì', async () => {
-    responses = [{ id: 'f1', name: 'X' }, { id: 'f2', name: 'Y' }]
-    await createFolder('tok', 'X', 'root')
-    await createFolder('tok', 'Y', 'p1')
-    expect(JSON.parse(calls[0].body!)).toEqual({ name: 'X', mimeType: 'application/vnd.google-apps.folder' })
-    expect(JSON.parse(calls[1].body!).parents).toEqual(['p1'])
-  })
+describe('Drive: spostamento', () => {
   it('moveFile: addParents/removeParents (senza togliere il nuovo padre)', async () => {
     responses = [{ id: 'f' }]
     await moveFile('tok', 'f', 'new', ['old', 'new'])
@@ -91,6 +74,6 @@ describe('Drive: file del database, inviti e revoche', () => {
   })
   it('errore HTTP → DriveError con stato', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ error: { message: 'nope' } }), { status: 404 })))
-    await expect(listFolders('tok', 'root')).rejects.toMatchObject({ status: 404, message: 'nope' })
+    await expect(listCandidates('tok')).rejects.toMatchObject({ status: 404, message: 'nope' })
   })
 })

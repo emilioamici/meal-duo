@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react'
-import { Crown, FolderOpen, Mail, UserMinus, UserPlus } from 'lucide-react'
+import { Check, Copy, Crown, FolderOpen, Mail, UserMinus, UserPlus } from 'lucide-react'
 import { Avatar } from './ui'
-import { FolderPicker } from './FolderPicker'
 import { MemberSheet } from './MemberSheet'
 import { useStore } from '../state/store'
 import { engine } from '../sync/engine'
 import { pickerConfigured } from '../sync/picker'
+import { bridgeAvailable } from '../sync/bridge'
 import { addMember, MEMBER_COLORS, removeMember, renameHouse, updateMember } from '../services/dbOps'
 import type { Member } from '../types'
 import { tb } from '../i18n/rich'
@@ -43,14 +43,18 @@ export function FamilyCard() {
   const [err, setErr] = useState('')
   const [info, setInfo] = useState('')
   const [folder, setFolder] = useState<string | null>(null)
-  const [picking, setPicking] = useState(false)
+  const [copied, setCopied] = useState(false)
+  const [bridge, setBridge] = useState(false)
   const [editing, setEditing] = useState<Member | null>(null)
   const linked = !!sync.fileId
+  /** entrato dall'invito (ponte del Worker): non ha accesso diretto al file e non gestisce inviti né cartella */
+  const viaBridge = linked && sync.bridged
   const owner = sync.ownerEmail?.toLowerCase() ?? ''
   const canManage = !linked || sync.canShare // in locale si gestisce da soli; con Drive solo il capofamiglia
   const unclaimed = members.filter((m) => !m.email && m.id !== me?.id)
 
-  useEffect(() => { if (sync.signedIn && sync.fileId) engine.currentFolder().then((f) => setFolder(f?.name ?? null)).catch(() => undefined) }, [sync.signedIn, sync.fileId])
+  useEffect(() => { void bridgeAvailable().then(setBridge) }, [])
+  useEffect(() => { if (sync.signedIn && sync.fileId && !sync.bridged) engine.currentFolder().then((f) => setFolder(f?.name ?? null)).catch(() => undefined) }, [sync.signedIn, sync.fileId, sync.bridged])
 
   const guard = async (fn: () => Promise<void>) => {
     setBusy(true); setErr(''); setInfo('')
@@ -123,7 +127,9 @@ export function FamilyCard() {
         })}
       </ul>
 
-      {canManage ? (
+      {viaBridge ? (
+        <p className="rounded-xl bg-bg/60 p-3 text-xs text-muted">{t('Sei entrato dall’invito: gli inviti ai nuovi membri li fa chi ha creato la famiglia.')}</p>
+      ) : canManage ? (
         <div className="space-y-2 rounded-2xl border border-line bg-bg/60 p-3">
           <p className="flex items-center gap-2 text-sm font-semibold">{linked ? <Mail size={16} className="text-brand" /> : <UserPlus size={16} className="text-brand" />}{linked ? t('Invita un membro') : t('Aggiungi membro')}</p>
           <input className="field" type="email" placeholder={linked ? t('Email Google della persona') : t('Email Google (facoltativa)')} aria-label={t('Email Google')} autoCapitalize="none" value={email} onChange={(e) => setEmail(e.target.value)} />
@@ -138,30 +144,37 @@ export function FamilyCard() {
             ? <button className="glass-btn btn-primary w-full" disabled={busy || !validEmail(email)} onClick={() => void invite()}>{t('Invia invito')}</button>
             : <button className="glass-btn btn-primary w-full" disabled={!name.trim()} onClick={addLocal}><UserPlus size={16} />{t('Aggiungi membro')}</button>}
           {linked && <p className="text-xs text-muted">{tb('L\'invito dà accesso in modifica al database su Drive. Se l\'app Google è in modalità <b>Testing</b>, aggiungi la stessa email anche tra gli <b>utenti di prova</b> in Google Cloud Console, altrimenti la persona non potrà accedere.')}</p>}
-          {linked && pickerConfigured() && <p className="text-xs text-muted">{t('Al primo accesso la persona sceglie il database con un tocco («Scegli il database della famiglia»): è un limite di Google per i permessi ristretti, non servono ID.')}</p>}
+          {linked && bridge && !sync.persistent && <p className="rounded-xl bg-brand/10 p-2 text-xs">{t('Per far entrare gli invitati senza il selettore di Google attiva l’accesso persistente (Sincronizzazione e account).')}</p>}
+          {linked && !bridge && pickerConfigured() && <p className="text-xs text-muted">{t('Al primo accesso la persona conferma il file con un tocco («Scegli il file e unisciti»): è un limite di Google per i permessi ristretti, non servono ID.')}</p>}
         </div>
       ) : (
         <p className="rounded-xl bg-bg/60 p-3 text-xs text-muted">{t('Solo il capofamiglia ({owner}) può invitare o rimuovere membri.', { owner: sync.ownerEmail ?? t('proprietario del file') })}</p>
       )}
+      {linked && sync.fileId && !viaBridge && (
+        <div className="mt-3 rounded-2xl border border-line bg-bg/60 p-3">
+          <label className="label !mt-0">{t('ID famiglia')}</label>
+          <div className="flex gap-2">
+            <input readOnly className="field font-mono !text-xs" value={sync.fileId} aria-label={t('ID famiglia')} onFocus={(e) => e.currentTarget.select()} />
+            <button className="glass-btn !h-11 !w-11 shrink-0 !p-0" aria-label={t('Copia ID')} onClick={() => { void navigator.clipboard?.writeText(sync.fileId!); setCopied(true); setTimeout(() => setCopied(false), 1500) }}>{copied ? <Check size={16} /> : <Copy size={16} />}</button>
+          </div>
+          <p className="mt-1.5 px-1 text-xs text-muted">{t('Il codice da dare a chi entra: dopo l’invito lo incolla all’accesso come «ID famiglia».')}</p>
+        </div>
+      )}
       {err && <p role="alert" className="mt-3 rounded-xl bg-exp/15 p-3 text-sm"><span className="font-bold text-exp">{t('Errore:')} </span>{err}</p>}
       {info && <p role="status" className="mt-3 rounded-xl bg-inc/15 p-3 text-sm">{info}</p>}
 
-      {linked && (
+      {linked && !viaBridge && (
         <div className="mt-4 flex items-center gap-3 border-t border-line/70 pt-3 text-sm">
           <FolderOpen size={18} className="shrink-0 text-brand" />
           <div className="min-w-0 flex-1">
             <p className="font-semibold">{t('Posizione del database')}</p>
             <p className="truncate text-xs text-muted">{sync.fileName}{folder ? ` · ${folder}` : ''}</p>
           </div>
-          {sync.canShare && (
+          {sync.canShare && pickerConfigured() && (
             <button className="glass-btn !px-3 !py-1.5 !text-xs" disabled={busy}
-              onClick={() => (pickerConfigured() ? void guard(async () => { const f = await engine.pickFolder(); if (f) { await engine.moveTo(f.id); setFolder(f.name); setInfo(t('Database spostato in «{name}».', { name: f.name })) } }) : setPicking(true))}>{t('Sposta…')}</button>
+              onClick={() => void guard(async () => { const f = await engine.pickFolder(); if (f) { await engine.moveTo(f.id); setFolder(f.name); setInfo(t('Database spostato in «{name}».', { name: f.name })) } })}>{t('Sposta…')}</button>
           )}
         </div>
-      )}
-      {picking && (
-        <FolderPicker title={t('Sposta il database in…')} onClose={() => setPicking(false)}
-          onPick={(f) => { setPicking(false); void guard(async () => { await engine.moveTo(f.id); setFolder(f.id === 'root' ? t('Il mio Drive') : f.name); setInfo(t('Database spostato in «{name}».', { name: f.id === 'root' ? t('Il mio Drive') : f.name })) }) }} />
       )}
       <MemberSheet open={!!editing} member={editing ?? undefined} onClose={() => setEditing(null)} />
     </div>

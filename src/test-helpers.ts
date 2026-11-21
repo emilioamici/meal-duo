@@ -12,6 +12,7 @@ export function fixtureDb(): AppDatabase {
     foodCatalog: [f('riso', 'Riso basmati', 'g'), f('latte', 'Latte', 'ml'), f('uova', 'Uova', 'pz')],
     plans,
     shopping: { checks: {}, extras: [], resetAt: EPOCH },
+    pantry: { purchases: {}, adjustments: {}, meals: {} },
   }
 }
 

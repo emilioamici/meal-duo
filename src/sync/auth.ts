@@ -4,13 +4,14 @@ import { t } from '../lib/text'
  * ottiene token Google freschi da sola, senza popup né tocchi. Qui si conserva solo un identificativo di sessione casuale.
  */
 import { pushUrl } from './push'
-import { pickerConfigured } from './picker'
 
 const SID_KEY = 'mealduo:session'
 const HASH = 'mealduo_session='
 
 const read = (): string => { try { return localStorage.getItem(SID_KEY) || '' } catch { return '' } }
 export const hasSession = (): boolean => !!read()
+/** Identificativo della sessione persistente: serve solo a chi registra la famiglia sul ponte del Worker. */
+export const sessionId = (): string => read()
 export function clearSession(): void { try { localStorage.removeItem(SID_KEY) } catch { /* noop */ } }
 
 /** Dopo il ritorno da Google l'identificativo di sessione è nel frammento dell'indirizzo: lo si salva e lo si toglie dalla barra. */
@@ -37,9 +38,8 @@ export function brokerAvailable(): Promise<boolean> {
 /** Apre il flusso di accesso di Google passando dal Worker; al ritorno l'app riparte da qui con la sessione nel frammento. */
 export function startBrokerLogin(hint?: string | null): void {
   const back = window.location.origin + window.location.pathname
-  const q = new URLSearchParams({ return: back })
+  const q = new URLSearchParams({ return: back, scope: 'file' }) // permesso ristretto, come in Clean Duo: solo i file dell'app
   if (hint) q.set('hint', hint)
-  if (pickerConfigured()) q.set('scope', 'file')   // permesso ristretto: solo i file dell'app
   window.location.assign(`${pushUrl()}/auth/start?${q}`)
 }
 

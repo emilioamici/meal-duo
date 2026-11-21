@@ -45,6 +45,17 @@ export function mergeDatabases(a: AppDatabase, b: AppDatabase): AppDatabase {
     checks[key] = x && y ? pick(x, y) : (x ?? y)!
   }
 
+  const mergeRecords = <T extends Versioned>(x: Record<string, T>, y: Record<string, T>): Record<string, T> => {
+    const out: Record<string, T> = {}
+    for (const k of new Set([...Object.keys(x), ...Object.keys(y)])) out[k] = x[k] && y[k] ? pick(x[k], y[k]) : (x[k] ?? y[k])
+    return out
+  }
+  const pantry = {
+    purchases: mergeRecords(a.pantry.purchases, b.pantry.purchases),
+    adjustments: mergeRecords(a.pantry.adjustments, b.pantry.adjustments),
+    meals: mergeRecords(a.pantry.meals, b.pantry.meals),
+  }
+
   const newer = a.lastUpdated >= b.lastUpdated ? a : b
   return {
     schema: 'meal-duo-db',
@@ -58,6 +69,7 @@ export function mergeDatabases(a: AppDatabase, b: AppDatabase): AppDatabase {
       extras: mergeById(a.shopping.extras, b.shopping.extras),
       resetAt: a.shopping.resetAt >= b.shopping.resetAt ? a.shopping.resetAt : b.shopping.resetAt,
     },
+    pantry,
     lastUpdated: a.lastUpdated >= b.lastUpdated ? a.lastUpdated : b.lastUpdated,
   }
 }

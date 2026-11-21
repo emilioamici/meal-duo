@@ -1,12 +1,15 @@
 import { useMemo, useRef, useState } from 'react'
-import { Bell, Cloud, Database, FileJson, Palette, Search, ShieldCheck, Trash2, Users, Utensils } from 'lucide-react'
+import { Bell, Cloud, Database, FileJson, Palette, Plus, Search, ShieldCheck, Trash2, Users, Utensils } from 'lucide-react'
 import { Accordion, ConfirmButton, PageHeader, Sheet } from '../components/ui'
 import { HeaderActions } from '../components/Chrome'
 import { MascotPeek } from '../components/Mascots'
 import { useStore } from '../state/store'
 import { useUi } from '../state/ui'
 import type { FoodCatalogItem } from '../types'
-import { deleteFood, foodUsage, liveFoods, mergeFoods, updateFood } from '../services/dbOps'
+import { deleteFood, foodUsage, liveFoods, mergeFoods, removeVariant, setVariant, updateFood } from '../services/dbOps'
+import { variantsOf } from '../services/variants'
+import { FoodInput } from '../components/FoodInput'
+import { toBase } from '../lib/units'
 import { parseDb } from '../services/dbSchema'
 import { findDuplicatePairs, FOOD_CATEGORIES, normalizeName, searchFoods } from '../lib/foodMatch'
 import { COMMON_UNITS } from '../lib/units'
@@ -68,7 +71,7 @@ export function SettingsView() {
           <DataSection />
         </Accordion>
 
-        <p className="flex gap-2 px-1 pb-4 text-xs text-muted"><ShieldCheck size={16} className="shrink-0" /><span>{t('I dati restano nel tuo Google Drive e su questo dispositivo: nessun server di terze parti per i dati.')} · Meal Duo · <a className="font-semibold text-brand" href={import.meta.env.BASE_URL + 'privacy.html'}>{t('Informativa sulla privacy')}</a></span></p>
+        <p className="flex gap-2 px-1 pb-4 text-xs text-muted"><ShieldCheck size={16} className="shrink-0" /><span>{t('I dati restano nel tuo Google Drive e su questo dispositivo. Il server della famiglia (il tuo Cloudflare Worker) li fa solo transitare per gli invitati e non li conserva.')} · Meal Duo · <a className="font-semibold text-brand" href={import.meta.env.BASE_URL + 'privacy.html'}>{t('Informativa sulla privacy')}</a></span></p>
       </div>
     </>
   )
@@ -134,9 +137,18 @@ function FoodSheet({ food, onClose }: { food?: FoodCatalogItem; onClose: () => v
   const [aliases, setAliases] = useState('')
   const [mergeQ, setMergeQ] = useState('')
   const [seeded, setSeeded] = useState('')
-  if (food && seeded !== food.id) { setSeeded(food.id); setName(food.name); setUnit(food.unit); setCategory(food.category); setAliases((food.aliases ?? []).join(', ')); setMergeQ('') }
+  const [varName, setVarName] = useState('')
+  const [varId, setVarId] = useState<string | undefined>()
+  const [varAmount, setVarAmount] = useState('100')
+  const [varTo, setVarTo] = useState('')
+  if (food && seeded !== food.id) { setSeeded(food.id); setVarName(''); setVarId(undefined); setVarAmount(toBase(1, food.unit).unit === 'pz' ? '1' : '100'); setVarTo(''); setName(food.name); setUnit(food.unit); setCategory(food.category); setAliases((food.aliases ?? []).join(', ')); setMergeQ('') }
   if (!food && seeded) setSeeded('')
   const usage = food ? foodUsage(db, food.id) : 0
+  const variants = food ? variantsOf(db, food.id) : []
+  const varFood = varId ? liveFoods(db).find((f) => f.id === varId) : undefined
+  const a = Number(varAmount.replace(',', '.')), b = Number(varTo.replace(',', '.'))
+  const compatible = !!food && !!varFood && toBase(1, food.unit).unit === toBase(1, varFood.unit).unit
+  const canAddVariant = !!food && !!varFood && compatible && a > 0 && b > 0
   const candidates = food && mergeQ.trim() ? searchFoods(liveFoods(db).filter((f) => f.id !== food.id), mergeQ, 4) : []
   const save = () => {
     if (!food || !name.trim()) return
@@ -157,6 +169,32 @@ function FoodSheet({ food, onClose }: { food?: FoodCatalogItem; onClose: () => v
       <div className="-mx-1 flex flex-wrap gap-2 px-1">{FOOD_CATEGORIES.map((c) => <button key={c} type="button" className={`chip !text-xs ${category === c ? 'chip-active' : ''}`} onClick={() => setCategory(c)}>{c}</button>)}</div>
       <label className="label">{t('Sinonimi (separati da virgola)')}</label>
       <input className="field" value={aliases} placeholder={t('pollo, petto pollo')} onChange={(e) => setAliases(e.target.value)} />
+
+      <label className="label">{t('Varianti')}</label>
+      <p className="text-xs text-muted">{t('Alimenti che lo sostituiscono, con il fattore di conversione (es. 100 g di pasta = 120 g di riso). Valgono nei due sensi.')}</p>
+      <ul className="mt-2 space-y-1.5">
+        {variants.map((v) => (
+          <li key={v.food.id} className="flex items-center justify-between gap-2 rounded-2xl border border-line px-3 py-2 text-sm">
+            <span className="min-w-0">{v.own ? `${v.variant.amount} ${food?.unit} ${food?.name} = ${v.variant.variantAmount} ${v.food.unit} ${v.food.name}` : `${v.variant.variantAmount} ${food?.unit} ${food?.name} = ${v.variant.amount} ${v.food.unit} ${v.food.name}`}</span>
+            <button className="glass-btn !h-9 !w-9 shrink-0 !p-0" aria-label={t('Rimuovi variante {name}', { name: v.food.name })} onClick={() => commit((d) => removeVariant(d, food!.id, v.food.id))}><Trash2 size={15} /></button>
+          </li>
+        ))}
+      </ul>
+      <div className="mt-2">
+        <FoodInput value={varName} catalog={liveFoods(db).filter((f) => f.id !== food?.id)} onChange={(x) => { setVarName(x); setVarId(undefined) }} onPick={(f) => { setVarName(f.name); setVarId(f.id) }} />
+      </div>
+      {varFood && (
+        <>
+          <div className="mt-2 grid grid-cols-[1fr_auto_1fr] items-center gap-2">
+            <div><input className="field" inputMode="decimal" value={varAmount} onChange={(e) => setVarAmount(e.target.value)} aria-label={t('Quantità di {name}', { name: food?.name ?? '' })} /><p className="mt-1 text-xs text-muted">{food?.unit} {food?.name}</p></div>
+            <span className="pb-5 font-bold">=</span>
+            <div><input className="field" inputMode="decimal" value={varTo} placeholder="120" onChange={(e) => setVarTo(e.target.value)} aria-label={t('Quantità di {name}', { name: varFood.name })} /><p className="mt-1 text-xs text-muted">{varFood.unit} {varFood.name}</p></div>
+          </div>
+          {!compatible && <p className="mt-1 text-xs text-exp">{t('Le unità non sono confrontabili (es. grammi con pezzi).')}</p>}
+          <button className="glass-btn mt-2 w-full" disabled={!canAddVariant}
+            onClick={() => { commit((d) => setVariant(d, food!.id, varFood.id, a, b)); showToast(t('Variante salvata')); setVarName(''); setVarId(undefined); setVarTo('') }}><Plus size={16} />{t('Aggiungi variante')}</button>
+        </>
+      )}
 
       <label className="label">{t('Unisci un duplicato in «{name}»', { name: food?.name ?? '' })}</label>
       <input className="field" value={mergeQ} placeholder={t('Cerca l\'alimento duplicato')} onChange={(e) => setMergeQ(e.target.value)} />

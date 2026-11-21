@@ -14,6 +14,7 @@ import { NotificationCenter, NotificationToast } from './components/Notification
 import { useLang } from './i18n'
 import { Gate } from './components/Gate'
 import { isLocalMode } from './lib/localMode'
+import { pendingInvite } from './sync/invite'
 import { isPristine } from './services/dbOps'
 import { buildShoppingList, shoppingProgress } from './services/shoppingListEngine'
 
@@ -70,7 +71,7 @@ function AppShell() {
 function Root() {
   const { sync, db } = useStore()
   useLang() // al cambio lingua si ridisegna tutto
-  const [local, setLocal] = useState(() => isLocalMode() || !isPristine(db)) // chi ha già dati propri non vede il Gate
+  const [local, setLocal] = useState(() => !pendingInvite() && (isLocalMode() || !isPristine(db))) // chi ha già dati propri non vede il Gate; un invito lo apre sempre
   if (!sync.fileId && !local) return <><Background /><Gate onLocal={() => setLocal(true)} /></>
   const locked = !!sync.fileId && sync.status === 'auth'
   return (

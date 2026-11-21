@@ -73,7 +73,9 @@ async function open(token: string, views: (g: any) => any[], title: string): Pro
 }
 
 /** Sceglie il file del database di famiglia (anche uno condiviso da un altro account). */
-export function pickDatabase(token: string): Promise<Picked | null> {
+export function pickDatabase(token: string, onlyFileId?: string): Promise<Picked | null> {
+  // con un invito il selettore mostra solo il file dell'invito: un tocco e l'app ottiene l'accesso
+  if (onlyFileId) return open(token, (g) => [new g.DocsView(g.ViewId.DOCS).setFileIds(onlyFileId).setIncludeFolders(false)], t('Scegli il database della famiglia'))
   return open(token, (g) => [
     new g.DocsView(g.ViewId.DOCS).setMimeTypes('application/json').setIncludeFolders(false).setOwnedByMe(false),
     new g.DocsView(g.ViewId.DOCS).setMimeTypes('application/json').setIncludeFolders(false),

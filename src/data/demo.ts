@@ -70,6 +70,7 @@ function build(): AppDatabase {
     foodCatalog: [...foodMap.values()],
     plans,
     shopping: { checks: {}, extras: [{ id: 'x_demo_1', name: 'Carta forno', checked: false, updatedAt: EPOCH }], resetAt: EPOCH },
+    pantry: { purchases: {}, adjustments: {}, meals: {} },
     lastUpdated: EPOCH,
   }
 }

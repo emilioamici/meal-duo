@@ -60,8 +60,7 @@ Ogni record unibile ha `updatedAt`, un eventuale `deleted` (tombstone) e **`by`*
 Il motore sceglie da solo: se `GET {VITE_PUSH_URL}/health` risponde `{auth:true}` il login passa dal Worker (`brokerAvailable()`), altrimenti usa il popup.
 
 ### 3.2 Scope
-- **Con Picker configurato** (`VITE_GOOGLE_API_KEY` + `VITE_GOOGLE_APP_ID`): solo `https://www.googleapis.com/auth/drive.file` (file creati dall'app o aperti con il Picker). Anche il Worker lo sa: `/auth/start?scope=file`.
-- **Senza Picker**: `https://www.googleapis.com/auth/drive` (tutto Drive) — necessario per vedere file condivisi da altri senza Picker, ma è un permesso molto ampio.
+Sempre e solo `https://www.googleapis.com/auth/drive.file` (non sensibile: nessuna verifica di Google), con o senza Picker. Anche il Worker lo sa: `/auth/start?scope=file`. Non esiste più il ripiego sullo scope completo `drive`: gli invitati accedono al database con l'**ID famiglia**, il **link d'invito** `#join=<ID>` o il **ponte del Worker** (§3.4).
 
 ### 3.3 Flusso del login persistente (broker)
 
@@ -78,6 +77,16 @@ Il motore sceglie da solo: se `GET {VITE_PUSH_URL}/health` risponde `{auth:true}
 - Ogni minuto: se mancano < 10 min → `brokerRenew()` (solo con sessione persistente).
 - Senza sessione: a ogni `pointerdown` (gesto utente, quindi popup consentito) → `renewIfNeeded()`: se restano < 15 min e l'ultimo tentativo è > 10 min fa, prova `requestToken({prompt:'none'})`.
 - Se il Worker è irraggiungibile → si resta sui dati locali (stato *Offline*, nessuna schermata di accesso). Se la sessione è revocata/scaduta (401) → stato `auth` → pillola «Accedi».
+
+
+### 3.4 Ponte del Worker (condivisione senza Picker)
+Con `drive.file` un invitato non vede il file creato da altri. Il Worker fa da ponte, come in Clean Duo:
+
+1. Chi ha creato la famiglia (ruolo `owner`, con sessione persistente) la registra: `POST /house/register`. Si ripete ogni 3 giorni e subito dopo ogni invito.
+2. Un invitato chiede `GET /house/mine` e riceve le famiglie che gli sono state condivise; poi legge con `/db/meta` e `/db/read` e scrive con `/db/write` (con `expectedVersion`: se il file è cambiato risponde `409` e il client rifà il merge).
+3. A ogni chiamata il Worker usa il refresh token del proprietario per leggere i permessi del file e controlla che l'email del chiamante sia presente, con token emesso per il tuo `GOOGLE_CLIENT_ID` (`ALLOWED_CLIENT_IDS` è facoltativa, per altri Client ID). **Per scrivere serve il ruolo owner/writer** (differenza voluta rispetto a Clean Duo). Il contenuto transita dal Worker ma non vi è conservato.
+
+Il link d'invito e l'ID famiglia (`src/sync/invite.ts`, chiave `mealduo:joinId`) servono a chi accede dal ponte o dal Picker ristretto.
 
 ---
 
@@ -145,6 +154,18 @@ Poi `IdentityGuard` associa l'account al membro (e, se per un ritardo dell'invit
 
 ### 5.3 Rimozione
 Il proprietario: `Membri → Modifica → Rimuovi membro` → `drive.removeShare()` (revoca i permessi `writer` di quell'email) + tombstone del membro e del suo piano.
+
+---
+
+## 5c. Varianti, pasti completati e dispensa
+
+**Varianti.** In *Impostazioni → Catalogo alimenti → alimento → Varianti* si dichiara che un alimento ne sostituisce un altro con un fattore di conversione: «100 g di pasta = 120 g di riso». Vale nei due sensi (si dichiara su un solo alimento) e solo tra unità confrontabili (g/kg, ml/l, pz). Nella scheda di un alimento di un pasto compare «Sostituisci con una variante»: un tocco cambia alimento e quantità (si salva con *Salva*).
+
+**Pasto completato.** In *Oggi* ogni pasto ha una spunta: completandolo, gli alimenti vengono scalati dalla dispensa; riaprendolo vengono rimessi. La spunta vale per quella data (il giorno scelto della settimana corrente) e per quel membro, quindi il piano settimanale resta un modello che si ripete.
+
+**Dispensa.** In *Spesa → Dispensa*. Si riempie spuntando un articolo della lista: l'app chiede quanto ne hai preso (di norma quanto serve) e lo aggiunge; togliendo la spunta si toglie. «Nuova spesa» azzera le spunte ma non la dispensa. Si svuota completando i pasti: se manca l'alimento ma in dispensa c'è una sua variante, si scala quella (convertita); ciò che non c'è non viene scalato e l'app lo segnala. Le quantità si correggono a mano (tocco sulla riga) e si possono aggiungere alimenti col pulsante +. La lista della spesa **non** sottrae la dispensa.
+
+**Come è salvata.** La dispensa non è una quantità ma un registro nel database (`pantry`): acquisti (chiave `riga|resetAt`), correzioni e pasti completati, ognuno con la propria chiave e con il merge last-write-wins per record. La giacenza si calcola (acquisti + correzioni − pasti completati), quindi due dispositivi che lavorano insieme non si sovrascrivono e la stessa spunta su due telefoni conta una volta. Chi usa ancora una versione vecchia dell'app non conosce questi campi: finché non si aggiorna può ometterli quando scrive.
 
 ---
 
@@ -280,7 +301,7 @@ Poi **Settings → Pages → Source: GitHub Actions** e rilancia il deploy.
 |---|---|---|
 | Avvio | **Gate** a schermo intero: senza `fileId` non si entra | **Uguale**: `Gate` (`components/Gate.tsx`). Unica aggiunta: «Prova senza account (dati demo)», perché la demo era un requisito di Meal Duo (`lib/localMode.ts`). Chi ha già dati locali non vede il Gate |
 | Sessione scaduta con famiglia collegata | Overlay che blocca l'app finché non si rientra | **Uguale**: overlay `login-overlay` (z-100) con `Gate reconnect`; l'app resta montata sotto con `inert` |
-| Selettore cartella | `FolderPicker` interno + Picker | **Uguale**: `FolderPicker` (esplora/crea cartelle) quando il Picker non è configurato, altrimenti Picker; in più «Sposta il database» (`engine.moveTo`) nella scheda Sincronizzazione |
+| Condivisione del file | ID famiglia + link `#join` + ponte Worker (scope `drive.file`) | **Uguale** (vedi §3.4); la cartella si sceglie solo col Picker |
 | Lingue | catalogo it/en | **Uguale**: `src/i18n` (`t`, `tb`, `tp`, `dayShort/dayLong`, `locale`), `en.ts`, selettore Automatico/Italiano/English, test di copertura |
 | Service worker | `public/sw.js` scritto a mano | Workbox (`vite-plugin-pwa`) + `public/push-sw.js` con gli stessi gestori `push`/`notificationclick` (stesso comportamento: niente notifica con l'app in primo piano, `postMessage` per sincronizzare subito). La differenza è solo nel *come* si fa il caching |
 | Apple Wallet | sì (Worker `/wallet/*`) | **Non portato** (specifico di MoneyDuo) |
@@ -304,7 +325,7 @@ Poi **Settings → Pages → Source: GitHub Actions** e rilancia il deploy.
 | Push (client) | `src/sync/push.ts`, `pushQueue.ts` |
 | Cache IndexedDB | `src/state/cache.ts` |
 | Store, notifiche, coda | `src/state/store.tsx`, `src/lib/notifications.ts` |
-| UI | `Gate`, `ConnectSheet` (flusso di collegamento), `FolderPicker`, `IdentityGuard`, `SyncCard`, `NotificationsCard`, `Notifications`, `Chrome` (pillola+campanella), `SettingsView` (impostazioni: membri/inviti, catalogo, piano JSON), `App.tsx` (`Root`: Gate / overlay di riconnessione) |
+| UI | `Gate`, `ConnectSheet` (flusso di collegamento), `IdentityGuard`, `SyncCard`, `NotificationsCard`, `Notifications`, `Chrome` (pillola+campanella), `SettingsView` (impostazioni: membri/inviti, catalogo, piano JSON), `App.tsx` (`Root`: Gate / overlay di riconnessione) |
 | Lingue | `src/i18n/{index,en,rich}.ts`, `src/lib/text.ts` |
 | Merge / DB | `src/services/merge.ts`, `dbOps.ts`, `dbSchema.ts` |
 | Service worker push | `public/push-sw.js`, `vite.config.ts` (`importScripts`) |
