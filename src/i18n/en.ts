@@ -239,7 +239,6 @@ export const EN: Record<string, string> = {
   "Possibili duplicati": "Possible duplicates",
   "Post-workout": "Post-workout",
   "Pre-workout": "Pre-workout",
-  "Prova inviata dal server: dovrebbe arrivare tra pochi secondi (con l'app in background).": "Test sent by the server: it should arrive in a few seconds (with the app in the background).",
   "Prova senza account (dati demo)": "Try without an account (demo data)",
   "Puoi aggiungere pasti extra: basta un nuovo elemento in \"meals\". I campi che iniziano con \"_\" sono ignorati.": "You can add extra meals: just add a new element in \"meals\". Fields starting with \"_\" are ignored.",
   "Quando l'app è aperta o in background": "When the app is open or in the background",
@@ -423,4 +422,9 @@ export const EN: Record<string, string> = {
   "{name}: completato": "{name}: completed",
   "{name}: da completare": "{name}: to complete",
   "In dispensa: {qty}": "In the pantry: {qty}",
+  "Prova inviata dal server: dovrebbe arrivare tra pochi secondi.": "Test sent by the server: it should arrive in a few seconds.",
+  "L'iscrizione di questo dispositivo era scaduta e il server l'ha tolta: disattiva e riattiva le notifiche, poi riprova.": "This device's subscription had expired and the server removed it: turn notifications off and on again, then try again.",
+  "Il server ha provato a inviare ma il servizio di notifiche del telefono ha rifiutato (codice {code}). Disattiva e riattiva le notifiche; se continua, controlla le chiavi VAPID del server.": "The server tried to send but the phone's notification service refused (code {code}). Turn notifications off and on again; if it keeps happening, check the server's VAPID keys.",
+  "Il server ha provato a inviare ma il servizio di notifiche del telefono ha rifiutato. Disattiva e riattiva le notifiche; se continua, controlla le chiavi VAPID del server.": "The server tried to send but the phone's notification service refused. Turn notifications off and on again; if it keeps happening, check the server's VAPID keys.",
+  "Il server non ha nessun dispositivo iscritto per la tua email: disattiva e riattiva le notifiche e riprova.": "The server has no device subscribed for your email: turn notifications off and on again, then try again.",
 }
