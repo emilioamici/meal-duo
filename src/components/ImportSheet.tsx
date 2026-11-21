@@ -27,13 +27,13 @@ export function ImportSheet({ open, onClose, initialMemberId }: { open: boolean;
   const doImport = () => {
     if (!parsed?.plan || !target) return
     commit((d) => applyImport(d, target.id, parsed.plan!).db)
-    showToast(t('Piano di {name} importato', { name: target.name }))
+    showToast(parsed.plan.hasDays ? t('Piano di {name} importato', { name: target.name }) : t('Varianti importate'))
     close()
   }
 
   return (
     <Sheet open={open} onClose={close} title={t('Importa piano JSON')}
-      footer={<button className="glass-btn btn-primary w-full !py-3.5" disabled={!parsed?.ok} onClick={doImport}>{t('Importa piano di {name}', { name: target?.name ?? '' })}</button>}>
+      footer={<button className="glass-btn btn-primary w-full !py-3.5" disabled={!parsed?.ok} onClick={doImport}>{parsed?.plan && !parsed.plan.hasDays ? t('Importa varianti') : t('Importa piano di {name}', { name: target?.name ?? '' })}</button>}>
       <label className="label !mt-2">{t('Importa per')}</label>
       <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
         {members.map((m) => (
@@ -65,7 +65,13 @@ export function ImportSheet({ open, onClose, initialMemberId }: { open: boolean;
       )}
       {parsed?.ok && preview && (
         <div className="mt-3 space-y-2 rounded-2xl border border-line bg-bg/60 p-3 text-sm">
-          <p className="font-bold">{tp(preview.report.items, 'Anteprima: {n} alimento', 'Anteprima: {n} alimenti', { n: preview.report.items })}</p>
+          <p className="font-bold">{parsed.plan?.hasDays ? tp(preview.report.items, 'Anteprima: {n} alimento', 'Anteprima: {n} alimenti', { n: preview.report.items }) : t('Anteprima: solo varianti')}</p>
+          {parsed.plan && parsed.plan.variants.length > 0 && (
+            <div><p className="text-xs font-semibold uppercase tracking-wide text-muted">{tp(parsed.plan.variants.length, 'Variante ({n})', 'Varianti ({n})', { n: parsed.plan.variants.length })}</p>
+              <ul className="mt-1 space-y-0.5 text-xs">{parsed.plan.variants.slice(0, 8).map((v) => <li key={`${v.from.name}|${v.to.name}`}>{v.from.quantity} {v.from.unit} {v.from.name} = {v.to.quantity} {v.to.unit} {v.to.name}</li>)}</ul>
+              {preview.report.variantsSkipped.length > 0 && <p className="mt-1 text-xs text-exp">{t('Non applicabili (unità del catalogo non confrontabile): {list}', { list: preview.report.variantsSkipped.join(', ') })}</p>}
+              <p className="mt-1 text-xs text-muted">{t('Le varianti sono del catalogo condiviso: valgono per tutta la famiglia.')}</p></div>
+          )}
           {preview.report.matched.length > 0 && (
             <div><p className="text-xs font-semibold uppercase tracking-wide text-muted">{t('Associati al catalogo')}</p>
               <ul className="mt-1 space-y-0.5 text-xs">{preview.report.matched.slice(0, 8).map((m) => <li key={m.from}>«{m.from}» → <span className="font-semibold">{m.to}</span></li>)}</ul></div>
@@ -75,7 +81,7 @@ export function ImportSheet({ open, onClose, initialMemberId }: { open: boolean;
               <p className="mt-1 text-xs">{preview.report.created.slice(0, 12).join(', ')}{preview.report.created.length > 12 ? '…' : ''}</p></div>
           )}
           {parsed.warnings.map((w) => <p key={w} className="text-xs text-muted">⚠ {w}</p>)}
-          <p className="text-xs text-muted">{tb('Il piano attuale di {name} verrà <b>sostituito</b>.', { name: target?.name ?? '' })}</p>
+          <p className="text-xs text-muted">{parsed.plan?.hasDays ? tb('Il piano attuale di {name} verrà <b>sostituito</b>.', { name: target?.name ?? '' }) : t('Il piano di {name} non verrà toccato.', { name: target?.name ?? '' })}</p>
         </div>
       )}
     </Sheet>

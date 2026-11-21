@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { fixtureDb, put } from '../test-helpers'
-import { checkLine, mergeFoods, removeVariant, resetShopping, setMealDone, setPantryQuantity, setVariant, uncheckLine } from './dbOps'
+import { checkLine, hideLine, mergeFoods, removeVariant, resetShopping, restoreLines, setMealDone, setPantryQuantity, setPurchaseQuantity, setVariant, uncheckLine } from './dbOps'
 import { dateOfDay, pantryList, pantryStock } from './pantry'
 import { variantQuantities, variantsOf } from './variants'
 import { buildShoppingList } from './shoppingListEngine'
@@ -72,6 +72,51 @@ describe('dispensa: acquisti dalla spesa', () => {
     expect(stock(db, 'riso')).toBe(320)
     db = setPantryQuantity(db, 'riso', 'g', 0)
     expect(pantryList(db)).toEqual([])
+  })
+})
+
+describe('lista: elimina con lo swipe e quantità modificabile', () => {
+  it('eliminare una riga la toglie dalla lista e dai conteggi; ripristinare la riporta', () => {
+    let db = withRice()
+    db = hideLine(db, 'riso|g')
+    expect(buildShoppingList(db)).toEqual([])
+    const all = buildShoppingList(db, undefined, true)
+    expect(all).toHaveLength(1)
+    expect(all[0].hidden).toBe(true)
+    db = restoreLines(db, ['riso|g'])
+    expect(buildShoppingList(db)).toHaveLength(1)
+    expect(buildShoppingList(db)[0].hidden).toBe(false)
+  })
+  it('eliminare una riga già presa toglie anche l\'acquisto dalla dispensa', () => {
+    let db = checkLine(withRice(), line(withRice(), 'riso|g'), 500)
+    db = hideLine(db, 'riso|g')
+    expect(stock(db, 'riso')).toBe(0)
+  })
+  it('«Nuova spesa» riporta le righe eliminate', () => {
+    const db = resetShopping(hideLine(withRice(), 'riso|g'))
+    expect(buildShoppingList(db)).toHaveLength(1)
+  })
+  it('l\'eliminazione vince o perde per ultima scrittura, su qualunque dispositivo', async () => {
+    const base = withRice()
+    const a = hideLine(base, 'riso|g')
+    await sleep()
+    const b = restoreLines(base, ['riso|g'])
+    expect(buildShoppingList(mergeDatabases(a, b))).toHaveLength(1)
+    expect(buildShoppingList(mergeDatabases(b, a))).toHaveLength(1)
+    expect(sameState(mergeDatabases(a, b), mergeDatabases(b, a))).toBe(true)
+  })
+  it('modificare la quantità di una riga già presa aggiorna la dispensa', () => {
+    let db = checkLine(withRice(), line(withRice(), 'riso|g'), 500)
+    db = setPurchaseQuantity(db, line(db, 'riso|g'), 750)
+    expect(stock(db, 'riso')).toBe(750)
+    db = setPurchaseQuantity(db, line(db, 'riso|g'), 0)
+    expect(stock(db, 'riso')).toBe(0)
+    db = setPurchaseQuantity(db, line(db, 'riso|g'), 200)
+    expect(stock(db, 'riso')).toBe(200)
+  })
+  it('l\'eliminazione sopravvive a parseDb', () => {
+    const db = hideLine(withRice(), 'riso|g')
+    expect(buildShoppingList(parseDb(JSON.parse(JSON.stringify(db))))).toEqual([])
   })
 })
 

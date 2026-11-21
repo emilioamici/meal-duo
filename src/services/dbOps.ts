@@ -263,6 +263,32 @@ export function checkLine(db: AppDatabase, line: { key: string; foodId: string; 
   return { ...next, pantry: { ...next.pantry, purchases: { ...next.pantry.purchases, [key]: purchase } } }
 }
 
+/** Elimina una riga dalla lista (swipe): sparisce per questa spesa e l'eventuale acquisto esce dalla dispensa. */
+export function hideLine(db: AppDatabase, lineKey: string): AppDatabase {
+  const next = uncheckLine(db, lineKey)
+  const at = nowIso()
+  return touch({ ...next, shopping: { ...next.shopping, checks: { ...next.shopping.checks, [lineKey]: { key: lineKey, checked: false, hidden: true, by: getActor(), updatedAt: at } } } }, at)
+}
+
+/** Riporta in lista le righe eliminate. */
+export function restoreLines(db: AppDatabase, lineKeys: string[]): AppDatabase {
+  return lineKeys.reduce((d, k) => toggleCheck(d, k, false), db)
+}
+
+/** Cambia la quantità presa di una riga già spuntata (la dispensa si aggiorna di conseguenza). */
+export function setPurchaseQuantity(db: AppDatabase, line: { key: string; foodId: string; unit: string }, quantity: number): AppDatabase {
+  const at = nowIso()
+  const key = `${line.key}|${db.shopping.resetAt}`
+  const cur = db.pantry.purchases[key]
+  if (!(quantity > 0)) {
+    if (!cur || cur.deleted) return db
+    return touch({ ...db, pantry: { ...db.pantry, purchases: { ...db.pantry.purchases, [key]: { ...cur, deleted: true, by: getActor(), updatedAt: at } } } }, at)
+  }
+  if (cur && !cur.deleted && cur.quantity === quantity) return db
+  const purchase = { key, foodId: line.foodId, unit: line.unit, quantity, by: getActor(), updatedAt: at }
+  return touch({ ...db, pantry: { ...db.pantry, purchases: { ...db.pantry.purchases, [key]: purchase } } }, at)
+}
+
 /** Toglie la spunta: l'acquisto corrispondente esce dalla dispensa. */
 export function uncheckLine(db: AppDatabase, lineKey: string): AppDatabase {
   const at = nowIso()

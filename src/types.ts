@@ -77,6 +77,8 @@ export interface ShoppingCheck extends Versioned {
   /** chiave riga: `${foodId}|${unitBase}` oppure `extra:${id}` */
   key: string
   checked: boolean
+  /** riga eliminata dalla lista (swipe) per questa spesa; «Nuova spesa» la riporta */
+  hidden?: boolean
 }
 
 export interface ExtraItem extends Versioned {
@@ -173,4 +175,5 @@ export interface ShoppingLine {
   /** quanto ce n'è già in dispensa (stessa unità base della riga) */
   inPantry: number
   checked: boolean
+  hidden: boolean
 }
