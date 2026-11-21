@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Toggle } from './ui'
 import { useStore } from '../state/store'
 import { engine } from '../sync/engine'
-import { disablePush, enablePush, pushConfigured, pushSupported, sendPush } from '../sync/push'
+import { disablePush, enablePush, pushConfigured, pushSupported, sendPush, testOutcome } from '../sync/push'
 import { t } from '../i18n'
 
 /**
@@ -67,8 +67,8 @@ export function NotificationsCard() {
     setMsg(null); setBusy(true)
     try {
       if (prefs.pushEnabled && server && sync.fileId && me?.email) {
-        await sendPush(sync.fileId, needToken(), { recipients: [me.email], title: t('Notifica di prova'), body: t('Le notifiche di Meal Duo funzionano.'), tag: 'mealduo-push-test', test: true })
-        setMsg({ text: t('Prova inviata dal server: dovrebbe arrivare tra pochi secondi (con l\'app in background).') })
+        const r = await sendPush(sync.fileId, needToken(), { recipients: [me.email], title: t('Notifica di prova'), body: t('Le notifiche di Meal Duo funzionano.'), tag: 'mealduo-push-test', test: true })
+        setMsg(testOutcome(r))
       } else {
         const opts: NotificationOptions = { body: t('Le notifiche di Meal Duo funzionano su questo dispositivo.'), icon: './icons/pwa-192.png', tag: 'mealduo-test' }
         const reg = await navigator.serviceWorker?.getRegistration()

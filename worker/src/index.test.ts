@@ -141,9 +141,25 @@ describe('/notify', () => {
     for (const d of [dead, flaky, ok]) await sub('tok-anna', d)
     pushStatus[dead.sub.endpoint] = 410; pushStatus[flaky.sub.endpoint] = 500
     const r = await (await call('/notify', { fileId: FILE, recipients: ['anna@example.com'], title: 'T', body: 'B' })).json() as { sent: number; failed: number; removed: number }
-    expect(r).toMatchObject({ sent: 1, failed: 1, removed: 1 })
+    expect(r).toMatchObject({ sent: 1, failed: 1, removed: 1, codes: [500] })
     const left = JSON.parse(kv.data.get(`s:${FILE}:anna@example.com`)!).map((s: { endpoint: string }) => s.endpoint).sort()
     expect(left).toEqual([flaky.sub.endpoint, ok.sub.endpoint].sort())
+  })
+  it('`codes` compare solo se ci sono invii non riusciti (e non conta i 410)', async () => {
+    const dead = device(), ok = device('updates.push.services.mozilla.com')
+    await sub('tok-anna', dead); await sub('tok-anna', ok)
+    pushStatus[dead.sub.endpoint] = 410
+    const r = await (await call('/notify', { fileId: FILE, recipients: ['anna@example.com'], title: 'T', body: 'B' })).json() as Record<string, unknown>
+    expect(r).toEqual({ ok: true, sent: 1, failed: 0, removed: 1 })
+    expect('codes' in r).toBe(false)
+  })
+  it('più errori: i codici sono tutti nella risposta', async () => {
+    const a = device(), b = device('web.push.apple.com')
+    await sub('tok-anna', a); await sub('tok-anna', b)
+    pushStatus[a.sub.endpoint] = 403; pushStatus[b.sub.endpoint] = 413
+    const r = await (await call('/notify', { fileId: FILE, recipients: ['anna@example.com'], title: 'T', body: 'B' })).json() as { failed: number; codes: number[] }
+    expect(r.failed).toBe(2)
+    expect([...r.codes].sort()).toEqual([403, 413])
   })
   it('limiti: destinatari, titolo obbligatorio, testo troncato, richiesta enorme', async () => {
     const many = Array.from({ length: 21 }, (_, i) => `u${i}@example.com`)

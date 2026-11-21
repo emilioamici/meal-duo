@@ -1,40 +1,41 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { sendPush, testOutcome, type PushResult } from './push'
 
-const store = new Map<string, string>()
-beforeEach(() => {
-  store.clear()
-  vi.stubGlobal('localStorage', { getItem: (k: string) => store.get(k) ?? null, setItem: (k: string, v: string) => void store.set(k, v), removeItem: (k: string) => void store.delete(k) })
+const R = (o: Partial<PushResult>): PushResult => ({ ok: true, sent: 0, failed: 0, removed: 0, codes: [], ...o })
+
+afterEach(() => vi.unstubAllGlobals())
+
+const serverSays = (body: unknown, status = 200) => {
+  vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify(body), { status })))
+}
+
+describe('sendPush: esito dal server', () => {
+  it('restituisce sent/failed/removed/codes, con 0 dove mancano', async () => {
+    serverSays({ ok: true, sent: 1 })
+    expect(await sendPush('f', 't', { recipients: ['a@b.it'], title: 'T', body: 'B' })).toEqual({ ok: true, sent: 1, failed: 0, removed: 0, codes: [] })
+    serverSays({ ok: true, sent: 0, failed: 2, removed: 1, codes: [403, 413] })
+    expect(await sendPush('f', 't', { recipients: ['a@b.it'], title: 'T', body: 'B' })).toEqual({ ok: true, sent: 0, failed: 2, removed: 1, codes: [403, 413] })
+    serverSays({})
+    expect(await sendPush('f', 't', { recipients: ['a@b.it'], title: 'T', body: 'B' })).toMatchObject({ sent: 0, failed: 0, removed: 0 })
+  })
 })
 
-const KEY = 'B' + 'a'.repeat(86)
-
-describe('configError', () => {
-  it('valori giusti o vuoti: nessun errore', async () => {
-    const { configError } = await import('./push')
-    expect(configError('https://mealduo-push.nome.workers.dev', KEY)).toBeNull()
-    expect(configError('', '')).toBeNull()
+describe('testOutcome: il pulsante dice la verità', () => {
+  it('sent > 0: inviata', () => {
+    expect(testOutcome(R({ sent: 1 }))).toEqual({ text: 'Prova inviata dal server: dovrebbe arrivare tra pochi secondi.', bad: false })
+    expect(testOutcome(R({ sent: 1 })).text).not.toContain('background')
   })
-  it('indirizzo: schema, percorso e spazi', async () => {
-    const { configError } = await import('./push')
-    expect(configError('mealduo-push.nome.workers.dev', KEY)).toContain('non è valido')
-    expect(configError('http://mealduo-push.nome.workers.dev', KEY)).toContain('non è valido')
-    expect(configError('https://mealduo-push.nome.workers.dev/health', KEY)).toContain('senza percorso')
-    expect(configError('https://mealduo push.dev', KEY)).toContain('non è valido')
+  it('removed > 0: iscrizione scaduta', () => {
+    expect(testOutcome(R({ removed: 1 }))).toEqual({ text: "L'iscrizione di questo dispositivo era scaduta e il server l'ha tolta: disattiva e riattiva le notifiche, poi riprova.", bad: true })
   })
-  it('chiave pubblica: lunghezza, prima lettera, prefisso incollato per errore, chiave privata', async () => {
-    const { configError } = await import('./push')
-    const url = 'https://x.workers.dev'
-    expect(configError(url, 'VAPID_PUBLIC_KEY=' + KEY)).toContain('87 caratteri')
-    expect(configError(url, 'a'.repeat(43))).toContain('chiave privata')          // la privata è lunga 43
-    expect(configError(url, KEY.slice(0, 80))).toContain('87 caratteri')
-    expect(configError(url, 'C' + 'a'.repeat(86))).toContain('iniziare con B')
+  it('failed > 0: rifiutato, con il codice', () => {
+    expect(testOutcome(R({ failed: 1, codes: [403] }))).toEqual({
+      text: 'Il server ha provato a inviare ma il servizio di notifiche del telefono ha rifiutato (codice 403). Disattiva e riattiva le notifiche; se continua, controlla le chiavi VAPID del server.', bad: true,
+    })
+    expect(testOutcome(R({ failed: 2, codes: [403, 403, 413] })).text).toContain('(codice 403, 413)')
+    expect(testOutcome(R({ failed: 1 })).text).toContain('ha rifiutato. Disattiva')
   })
-  it('la chiave generata dallo script ha il formato atteso', async () => {
-    const { generateKeyPairSync } = await import('node:crypto')
-    const { configError } = await import('./push')
-    const pub = generateKeyPairSync('ec', { namedCurve: 'P-256' }).publicKey.export({ format: 'jwk' })
-    const raw = Buffer.concat([Buffer.from([4]), Buffer.from(pub.x!, 'base64url'), Buffer.from(pub.y!, 'base64url')]).toString('base64url')
-    expect(raw).toHaveLength(87)
-    expect(configError('https://x.workers.dev', raw)).toBeNull()
+  it('nessun dispositivo: lo dice', () => {
+    expect(testOutcome(R({}))).toEqual({ text: 'Il server non ha nessun dispositivo iscritto per la tua email: disattiva e riattiva le notifiche e riprova.', bad: true })
   })
 })

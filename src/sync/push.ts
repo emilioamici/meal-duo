@@ -102,7 +102,28 @@ export async function disablePush(fileId: string, token: string | null): Promise
 
 export interface PushMessage { recipients: string[]; title: string; body: string; tag?: string; test?: boolean }
 
-/** Chiede al server di inviare una notifica ai destinatari. */
-export async function sendPush(fileId: string, token: string, m: PushMessage): Promise<void> {
-  await post('/notify', token, { fileId, ...m })
+export interface PushResult { ok: boolean; sent: number; failed: number; removed: number; codes: number[] }
+
+const count = (v: unknown): number => (typeof v === 'number' && Number.isFinite(v) && v > 0 ? v : 0)
+
+/** Chiede al server di inviare una notifica ai destinatari e ne riporta l'esito (0 dove il server non lo dice). */
+export async function sendPush(fileId: string, token: string, m: PushMessage): Promise<PushResult> {
+  const j = (await post('/notify', token, { fileId, ...m })) as { ok?: unknown; sent?: unknown; failed?: unknown; removed?: unknown; codes?: unknown }
+  return {
+    ok: j.ok !== false,
+    sent: count(j.sent), failed: count(j.failed), removed: count(j.removed),
+    codes: Array.isArray(j.codes) ? j.codes.filter((c): c is number => typeof c === 'number') : [],
+  }
+}
+
+/** Cosa dire dopo «Invia notifica di prova», in base a ciò che il server ha davvero fatto. */
+export function testOutcome(r: PushResult): { text: string; bad: boolean } {
+  if (r.sent > 0) return { text: t('Prova inviata dal server: dovrebbe arrivare tra pochi secondi.'), bad: false }
+  if (r.removed > 0) return { text: t('L\'iscrizione di questo dispositivo era scaduta e il server l\'ha tolta: disattiva e riattiva le notifiche, poi riprova.'), bad: true }
+  if (r.failed > 0) {
+    return r.codes.length
+      ? { text: t('Il server ha provato a inviare ma il servizio di notifiche del telefono ha rifiutato (codice {code}). Disattiva e riattiva le notifiche; se continua, controlla le chiavi VAPID del server.', { code: [...new Set(r.codes)].join(', ') }), bad: true }
+      : { text: t('Il server ha provato a inviare ma il servizio di notifiche del telefono ha rifiutato. Disattiva e riattiva le notifiche; se continua, controlla le chiavi VAPID del server.'), bad: true }
+  }
+  return { text: t('Il server non ha nessun dispositivo iscritto per la tua email: disattiva e riattiva le notifiche e riprova.'), bad: true }
 }

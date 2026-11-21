@@ -192,7 +192,7 @@ La coda viene svuotata **solo dopo che i dati sono arrivati su Drive** (`afterSy
 
 ### 6.4 Il service worker
 `public/push-sw.js` (caricato da Workbox via `importScripts`):
-- `push`: se c'è una finestra visibile **non mostra nulla** e manda `postMessage({type:'mealduo-push'})` → l'app sincronizza subito; altrimenti `showNotification(title, {body, tag, icon})`.
+- `push`: mostra **sempre** `showNotification(title, {body, tag, icon})` (Safari/WebKit non ammette push silenziose: senza notifica non compare nulla e dopo poche volte l'iscrizione viene tolta). Se c'è una finestra visibile le manda anche `postMessage({type:'mealduo-push'})` → l'app sincronizza subito. Il `tag` evita i doppioni con la campanella.
 - `notificationclick`: porta in primo piano l'app o la apre.
 Le chiamate cross-origin (Google) non vengono mai intercettate né messe in cache.
 
@@ -287,7 +287,7 @@ Poi **Settings → Pages → Source: GitHub Actions** e rilancia il deploy.
 | «The API developer key is invalid» nel Picker | restrizione della chiave con percorso: usa `https://<utente>.github.io/*`; controlla anche che Picker API sia abilitata e inclusa nelle restrizioni della chiave |
 | `404` aprendo il database (secondo membro) | con `drive.file` serve il **Picker**; oppure il file è stato spostato/non più condiviso |
 | «Permesso negato: serve l'accesso in modifica» | il proprietario deve dare il ruolo Editor |
-| La prova push non arriva | permesso notifiche bloccato per il sito; l'app deve essere in background (in primo piano compare la campanella). Log: `npx wrangler tail` |
+| La prova push non arriva | permesso notifiche bloccato per il sito. Il pulsante «Invia una notifica di prova» riporta l'esito vero del server (`sent`/`failed`/`removed`, e con `codes` i codici rifiutati dal servizio push). Log: `npx wrangler tail` |
 | iPhone non riceve il push | serve iOS 16.4+ e l'app aperta dall'icona sulla Home |
 | Un dispositivo non riceve più nulla | disattiva/riattiva «Attiva notifiche» (il Worker elimina le iscrizioni non più valide) |
 | «Copia locale non allineata a Drive» | transitorio: al ciclo successivo si rilegge Drive; nessun dato viene sovrascritto |
@@ -303,7 +303,7 @@ Poi **Settings → Pages → Source: GitHub Actions** e rilancia il deploy.
 | Sessione scaduta con famiglia collegata | Overlay che blocca l'app finché non si rientra | **Uguale**: overlay `login-overlay` (z-100) con `Gate reconnect`; l'app resta montata sotto con `inert` |
 | Condivisione del file | ID famiglia + link `#join` + ponte Worker (scope `drive.file`) | **Uguale** (vedi §3.4); la cartella si sceglie solo col Picker |
 | Lingue | catalogo it/en | **Uguale**: `src/i18n` (`t`, `tb`, `tp`, `dayShort/dayLong`, `locale`), `en.ts`, selettore Automatico/Italiano/English, test di copertura |
-| Service worker | `public/sw.js` scritto a mano | Workbox (`vite-plugin-pwa`) + `public/push-sw.js` con gli stessi gestori `push`/`notificationclick` (stesso comportamento: niente notifica con l'app in primo piano, `postMessage` per sincronizzare subito). La differenza è solo nel *come* si fa il caching |
+| Service worker | `public/sw.js` scritto a mano | Workbox (`vite-plugin-pwa`) + `public/push-sw.js` con gli stessi gestori `push`/`notificationclick` (stesso comportamento, con una differenza voluta per Safari: la notifica di sistema si mostra sempre, anche con l'app in primo piano, più `postMessage` per sincronizzare subito). La differenza è solo nel *come* si fa il caching |
 | Apple Wallet | sì (Worker `/wallet/*`) | **Non portato** (specifico di MoneyDuo) |
 
 **Dove Meal Duo resta volutamente diverso** (non sono lacune da colmare):

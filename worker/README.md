@@ -118,7 +118,7 @@ Con lo scope `drive.file` gli invitati non vedono il file della famiglia. Il Wor
 ## Limiti
 - La notifica parte solo per le modifiche **fatte dall'app** (non per quelle fatte a mano sul file in Drive).
 - **La notifica parte quando i dati arrivano su Drive**, non quando tocchi: così chi la riceve trova subito la spesa aggiornata. Se sei offline, le notifiche restano in coda sul dispositivo (fino a 24 ore, max 100) e partono dopo l'invio dei dati; se il server push non risponde si riprova al ciclo successivo. Se nel frattempo elimini la voce extra, la notifica viene scartata. In quel momento serve una sessione Google valida.
-- Se l'app è in primo piano, il push non mostra nulla: sincronizza subito e compare la campanella. Le spunte successive dello stesso autore **sostituiscono** la notifica precedente (stesso `tag`), per non riempire il telefono mentre qualcuno fa la spesa.
+- Anche con l'app in primo piano il push mostra la notifica di sistema (Safari non ammette push silenziose) e l'app sincronizza subito. Le spunte successive dello stesso autore **sostituiscono** la notifica precedente (stesso `tag`), per non riempire il telefono mentre qualcuno fa la spesa.
 
 ## Sviluppo e test
 ```bash
