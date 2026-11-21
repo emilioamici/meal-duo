@@ -147,8 +147,7 @@ function FoodSheet({ food, onClose }: { food?: FoodCatalogItem; onClose: () => v
   const variants = food ? variantsOf(db, food.id) : []
   const varFood = varId ? liveFoods(db).find((f) => f.id === varId) : undefined
   const a = Number(varAmount.replace(',', '.')), b = Number(varTo.replace(',', '.'))
-  const compatible = !!food && !!varFood && toBase(1, food.unit).unit === toBase(1, varFood.unit).unit
-  const canAddVariant = !!food && !!varFood && compatible && a > 0 && b > 0
+  const canAddVariant = !!food && !!varFood && a > 0 && b > 0
   const candidates = food && mergeQ.trim() ? searchFoods(liveFoods(db).filter((f) => f.id !== food.id), mergeQ, 4) : []
   const save = () => {
     if (!food || !name.trim()) return
@@ -190,7 +189,6 @@ function FoodSheet({ food, onClose }: { food?: FoodCatalogItem; onClose: () => v
             <span className="pb-5 font-bold">=</span>
             <div><input className="field" inputMode="decimal" value={varTo} placeholder="120" onChange={(e) => setVarTo(e.target.value)} aria-label={t('Quantità di {name}', { name: varFood.name })} /><p className="mt-1 text-xs text-muted">{varFood.unit} {varFood.name}</p></div>
           </div>
-          {!compatible && <p className="mt-1 text-xs text-exp">{t('Le unità non sono confrontabili (es. grammi con pezzi).')}</p>}
           <button className="glass-btn mt-2 w-full" disabled={!canAddVariant}
             onClick={() => { commit((d) => setVariant(d, food!.id, varFood.id, a, b)); showToast(t('Variante salvata')); setVarName(''); setVarId(undefined); setVarTo('') }}><Plus size={16} />{t('Aggiungi variante')}</button>
         </>

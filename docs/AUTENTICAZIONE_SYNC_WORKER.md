@@ -159,7 +159,7 @@ Il proprietario: `Membri → Modifica → Rimuovi membro` → `drive.removeShare
 
 ## 5c. Varianti, pasti completati e dispensa
 
-**Varianti.** In *Impostazioni → Catalogo alimenti → alimento → Varianti* si dichiara che un alimento ne sostituisce un altro con un fattore di conversione: «100 g di pasta = 120 g di riso». Vale nei due sensi (si dichiara su un solo alimento) e solo tra unità confrontabili (g/kg, ml/l, pz). Nella scheda di un alimento di un pasto compare «Sostituisci con una variante»: un tocco cambia alimento e quantità (si salva con *Salva*).
+**Varianti.** In *Impostazioni → Catalogo alimenti → alimento → Varianti* si dichiara che un alimento ne sostituisce un altro con un fattore di conversione: «100 g di pasta = 120 g di riso». Vale nei due sensi (si dichiara su un solo alimento) e anche tra unità diverse (es. 1 pz di uova = 50 g di albume: il fattore è sempre tra le unità predefinite dei due alimenti). Nella scheda di un alimento di un pasto compare «Sostituisci con una variante»: un tocco cambia alimento e quantità (si salva con *Salva*).
 
 **Pasto completato.** In *Oggi* ogni pasto ha una spunta: completandolo, gli alimenti vengono scalati dalla dispensa; riaprendolo vengono rimessi. La spunta vale per quella data (il giorno scelto della settimana corrente) e per quel membro, quindi il piano settimanale resta un modello che si ripete.
 
