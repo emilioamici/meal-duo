@@ -23,7 +23,13 @@ export function isChecked(db: AppDatabase, key: string): boolean {
   return !!c && !c.deleted && c.checked && c.updatedAt >= db.shopping.resetAt
 }
 
-export function buildShoppingList(db: AppDatabase, filters: ShoppingFilters = NO_FILTERS): ShoppingLine[] {
+export function isHidden(db: AppDatabase, key: string): boolean {
+  const c = db.shopping.checks[key]
+  return !!c && !c.deleted && c.hidden === true && c.updatedAt >= db.shopping.resetAt
+}
+
+/** Righe della spesa. Quelle eliminate con lo swipe restano fuori, salvo `includeHidden`. */
+export function buildShoppingList(db: AppDatabase, filters: ShoppingFilters = NO_FILTERS, includeHidden = false): ShoppingLine[] {
   const foods = new Map<string, FoodCatalogItem>(db.foodCatalog.map((f) => [f.id, f]))
   const excludedMembers = new Set(filters.excludedMemberIds)
   const excludedDays = new Set<DayIndex>(filters.excludedDays)
@@ -70,9 +76,10 @@ export function buildShoppingList(db: AppDatabase, filters: ShoppingFilters = NO
         .map(([memberId, quantity]) => ({ memberId, quantity: round2(quantity) })),
       inPantry: Math.max(0, round2(stock.get(stockKey(a.foodId, a.unit)) ?? 0)),
       checked: isChecked(db, key),
+      hidden: isHidden(db, key),
     })
   }
-  return lines.sort((x, y) => x.name.localeCompare(y.name, 'it') || x.unit.localeCompare(y.unit))
+  return lines.filter((l) => includeHidden || !l.hidden).sort((x, y) => x.name.localeCompare(y.name, 'it') || x.unit.localeCompare(y.unit))
 }
 
 export function groupByCategory(lines: ShoppingLine[]): { category: string; lines: ShoppingLine[] }[] {

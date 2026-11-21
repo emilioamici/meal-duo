@@ -99,7 +99,7 @@ export function parseDb(raw: unknown): AppDatabase {
   const checks: AppDatabase['shopping']['checks'] = {}
   if (isObj(sh.checks)) {
     for (const [k, c] of Object.entries(sh.checks)) {
-      if (isObj(c)) checks[k] = { key: k, checked: c.checked === true, by: by(c.by), updatedAt: iso(c.updatedAt), deleted: c.deleted === true ? true : undefined }
+      if (isObj(c)) checks[k] = { key: k, checked: c.checked === true, hidden: c.hidden === true ? true : undefined, by: by(c.by), updatedAt: iso(c.updatedAt), deleted: c.deleted === true ? true : undefined }
     }
   }
   const extras = (Array.isArray(sh.extras) ? sh.extras : []).filter(isObj).map((e) => ({

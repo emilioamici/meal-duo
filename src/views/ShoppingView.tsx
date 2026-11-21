@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
-import { AnimatePresence, motion } from 'framer-motion'
-import { Check, Plus, RotateCcw, SlidersHorizontal, X } from 'lucide-react'
+import { AnimatePresence, motion, useAnimationControls, useMotionValue, useTransform } from 'framer-motion'
+import { Check, Plus, RotateCcw, ShoppingCart, SlidersHorizontal, Trash2, X } from 'lucide-react'
 import { PageHeader, CleanBar, Segmented, Sheet, ConfirmButton, EmptyCard, Avatar, Accordion } from '../components/ui'
 import { Fab, HeaderActions } from '../components/Chrome'
 import { MascotImg, MascotPeek } from '../components/Mascots'
@@ -8,7 +8,7 @@ import { useStore } from '../state/store'
 import { useUi } from '../state/ui'
 import { DAY_INDEXES, type DayIndex, type ExtraItem, type Member, type ShoppingLine } from '../types'
 import { buildShoppingList, extraChecked, groupByCategory, liveExtras, shoppingProgress } from '../services/shoppingListEngine'
-import { addExtra, checkLine, removeExtra, resetShopping, toggleExtra, uncheckLine } from '../services/dbOps'
+import { addExtra, checkLine, hideLine, removeExtra, resetShopping, restoreLines, setPurchaseQuantity, toggleExtra, uncheckLine } from '../services/dbOps'
 import { PantryPanel } from '../components/PantryPanel'
 import { formatCompact, formatQuantity, round2 } from '../lib/units'
 import { t, dayShort, tp } from '../i18n'
@@ -18,9 +18,10 @@ export function ShoppingView() {
   const { filters, setFilters, grouped, setGrouped, celebrate } = useUi()
   const [extraOpen, setExtraOpen] = useState(false)
   const [mode, setMode] = useState<'list' | 'pantry'>('list')
-  const [buying, setBuying] = useState<{ line: ShoppingLine; x: number; y: number } | null>(null)
+  const [drafts, setDrafts] = useState<Record<string, string>>({}) // quantità modificate in lista, finché non si spunta
 
   const lines = useMemo(() => buildShoppingList(db, filters), [db, filters])
+  const hiddenKeys = useMemo(() => buildShoppingList(db, filters, true).filter((l) => l.hidden).map((l) => l.key), [db, filters])
   const extras = liveExtras(db)
   const progress = shoppingProgress(db, lines)
   const memberMap = useMemo(() => new Map(members.map((m) => [m.id, m])), [members])
@@ -35,16 +36,27 @@ export function ShoppingView() {
   const celebrateIfDone = (e: React.MouseEvent, willBeDone: number) => {
     if (progress.total > 0 && willBeDone === progress.total) celebrate(e.clientX, e.clientY, t('Spesa completata!'))
   }
-  const onToggleLine = (e: React.MouseEvent, l: ShoppingLine) => {
-    if (l.checked) return commit((d) => uncheckLine(d, l.key))
-    setBuying({ line: l, x: e.clientX, y: e.clientY }) // prima si chiede quanto ne è stato preso (entra in dispensa)
+  /** quantità proposta: quanto serve, o quanto manca se in casa ce n'è già un po' */
+  const proposed = (l: ShoppingLine) => (l.inPantry > 0 && l.total > l.inPantry ? round2(l.total - l.inPantry) : l.total)
+  const purchaseOf = (l: ShoppingLine) => db.pantry.purchases[`${l.key}|${db.shopping.resetAt}`]
+  const shownQty = (l: ShoppingLine) => drafts[l.key] ?? String(l.checked ? purchaseOf(l)?.quantity ?? '' : proposed(l))
+  const parseQty = (v: string | undefined): number | null => {
+    const n = Number((v ?? '').replace(',', '.'))
+    return v !== undefined && v.trim() !== '' && Number.isFinite(n) && n >= 0 ? n : null
   }
-  const confirmBuy = (quantity: number | null) => {
-    if (!buying) return
-    const { line, x, y } = buying
-    commit((d) => checkLine(d, line, quantity))
-    setBuying(null)
-    if (progress.total > 0 && progress.done + 1 === progress.total) celebrate(x, y, t('Spesa completata!'))
+  const dropDraft = (key: string) => setDrafts((d) => { const { [key]: _gone, ...rest } = d; return rest })
+  const onToggleLine = (e: React.MouseEvent, l: ShoppingLine) => {
+    if (l.checked) { dropDraft(l.key); return commit((d) => uncheckLine(d, l.key)) }
+    const qty = parseQty(drafts[l.key]) ?? proposed(l) // quanto scritto in lista, altrimenti quanto propone l'app: entra in dispensa
+    commit((d) => checkLine(d, l, qty > 0 ? qty : null))
+    dropDraft(l.key)
+    celebrateIfDone(e, progress.done + 1)
+  }
+  const onQtyBlur = (l: ShoppingLine) => {
+    if (!l.checked || drafts[l.key] === undefined) return
+    const n = parseQty(drafts[l.key])
+    if (n !== null) commit((d) => setPurchaseQuantity(d, l, n))
+    dropDraft(l.key)
   }
   const onToggleExtra = (e: React.MouseEvent, x: ExtraItem) => {
     const was = extraChecked(db, x)
@@ -122,19 +134,28 @@ export function ShoppingView() {
               <AnimatePresence initial={false}>
                 {s.lines.map((l) => (
                   <motion.li key={l.key} layout initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, x: 90, scale: 0.92 }} transition={{ type: 'spring', stiffness: 400, damping: 34 }}>
-                    <div className={`card flex items-start gap-3 p-3 ${l.checked ? 'opacity-60' : ''}`}>
-                      <CheckButton checked={l.checked} label={t(l.checked ? '{name}: da comprare' : '{name}: preso', { name: l.name })} onClick={(e) => onToggleLine(e, l)} />
-                      <div className="min-w-0 flex-1 pt-0.5">
-                        <div className="flex items-baseline justify-between gap-3">
-                          <span className={`min-w-0 truncate font-semibold leading-tight ${l.checked ? 'line-through' : ''}`}>{l.name}</span>
-                          <span className="shrink-0 font-extrabold">{formatQuantity(l.total, l.unit)}</span>
-                        </div>
-                        {l.inPantry > 0 && <p className="mt-1 text-xs font-semibold text-muted">{t('In dispensa: {qty}', { qty: formatQuantity(l.inPantry, l.unit) })}</p>}
-                        <div className="mt-1.5 flex flex-wrap gap-1.5">
-                          {l.perMember.map((p) => <MemberBadge key={p.memberId} member={memberMap.get(p.memberId)} text={formatCompact(p.quantity, l.unit)} />)}
+                    <SwipeRow label={t('Rimuovi {name}', { name: l.name })} onDelete={() => commit((d) => hideLine(d, l.key))}>
+                      <div className={`card flex items-start gap-3 p-3 ${l.checked ? 'opacity-60' : ''}`}>
+                        <CheckButton checked={l.checked} label={t(l.checked ? '{name}: da comprare' : '{name}: preso', { name: l.name })} onClick={(e) => onToggleLine(e, l)} />
+                        <div className="min-w-0 flex-1 pt-0.5">
+                          <div className="flex items-center justify-between gap-3">
+                            <span className={`min-w-0 truncate font-semibold leading-tight ${l.checked ? 'line-through' : ''}`}>{l.name}</span>
+                            <span className="flex shrink-0 items-baseline gap-1">
+                              <input className="w-[4.5rem] rounded-xl border border-line bg-bg px-2 py-1 text-right font-extrabold" inputMode="decimal" value={shownQty(l)} aria-label={t('Quantità di {name}', { name: l.name })}
+                                onPointerDown={(e) => e.stopPropagation()} onFocus={(e) => e.currentTarget.select()}
+                                onChange={(e) => setDrafts((d) => ({ ...d, [l.key]: e.target.value }))} onBlur={() => onQtyBlur(l)} onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()} />
+                              <span className="text-sm font-semibold text-muted">{l.unit}</span>
+                            </span>
+                          </div>
+                          <p className="mt-1 text-xs font-semibold text-muted">
+                            {t('Servono {qty}', { qty: formatQuantity(l.total, l.unit) })}{l.inPantry > 0 && ` · ${t('In dispensa: {qty}', { qty: formatQuantity(l.inPantry, l.unit) })}`}
+                          </p>
+                          <div className="mt-1.5 flex flex-wrap gap-1.5">
+                            {l.perMember.map((p) => <MemberBadge key={p.memberId} member={memberMap.get(p.memberId)} text={formatCompact(p.quantity, l.unit)} />)}
+                          </div>
                         </div>
                       </div>
-                    </div>
+                    </SwipeRow>
                   </motion.li>
                 ))}
               </AnimatePresence>
@@ -151,17 +172,24 @@ export function ShoppingView() {
                   const done = extraChecked(db, x)
                   return (
                     <motion.li key={x.id} layout initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, x: 90, scale: 0.92 }} transition={{ type: 'spring', stiffness: 400, damping: 34 }}>
-                      <div className={`card flex items-center gap-3 p-3 ${done ? 'opacity-60' : ''}`}>
-                        <CheckButton checked={done} label={t(done ? '{name}: da comprare' : '{name}: preso', { name: x.name })} onClick={(e) => onToggleExtra(e, x)} />
-                        <span className={`min-w-0 flex-1 truncate font-semibold ${done ? 'line-through' : ''}`}>{x.name}{x.quantity && <span className="ml-2 text-sm font-medium text-muted">{x.quantity}</span>}</span>
-                        <button className="glass-btn !h-10 !w-10 shrink-0 !p-0" aria-label={t('Rimuovi {name}', { name: x.name })} onClick={() => commit((d) => removeExtra(d, x.id))}><X size={16} /></button>
-                      </div>
+                      <SwipeRow label={t('Rimuovi {name}', { name: x.name })} onDelete={() => commit((d) => removeExtra(d, x.id))}>
+                        <div className={`card flex items-center gap-3 p-3 ${done ? 'opacity-60' : ''}`}>
+                          <CheckButton checked={done} label={t(done ? '{name}: da comprare' : '{name}: preso', { name: x.name })} onClick={(e) => onToggleExtra(e, x)} />
+                          <span className={`min-w-0 flex-1 truncate font-semibold ${done ? 'line-through' : ''}`}>{x.name}{x.quantity && <span className="ml-2 text-sm font-medium text-muted">{x.quantity}</span>}</span>
+                        </div>
+                      </SwipeRow>
                     </motion.li>
                   )
                 })}
               </AnimatePresence>
             </ul>
           </div>
+        )}
+
+        {hiddenKeys.length > 0 && (
+          <button className="glass-btn w-full" onClick={() => commit((d) => restoreLines(d, hiddenKeys))}>
+            <RotateCcw size={16} />{tp(hiddenKeys.length, '{n} articolo eliminato · Ripristina', '{n} articoli eliminati · Ripristina', { n: hiddenKeys.length })}
+          </button>
         )}
 
         {progress.total > 0 && (
@@ -172,37 +200,45 @@ export function ShoppingView() {
 
       <Fab label={t('Aggiungi voce extra')} onClick={() => setExtraOpen(true)} />
       <ExtraSheet open={extraOpen} onClose={() => setExtraOpen(false)} />
-      <BuySheet buying={buying?.line ?? null} onClose={() => setBuying(null)} onConfirm={confirmBuy} />
       </>}
     </>
   )
 }
 
+/** Pulsante «preso»: a riposo un carrello con un check in trasparenza, da spuntato il check pieno. */
 function CheckButton({ checked, label, onClick }: { checked: boolean; label: string; onClick: (e: React.MouseEvent) => void }) {
   return (
     <motion.button whileTap={{ scale: 0.82 }} onClick={onClick} role="checkbox" aria-checked={checked} aria-label={label}
       className={`glass-btn !h-10 !w-10 shrink-0 !p-0 ${checked ? 'btn-primary' : ''}`}>
-      {checked && <Check size={20} strokeWidth={3} />}
+      {checked ? <Check size={20} strokeWidth={3} /> : (
+        <span className="relative block h-5 w-5 opacity-40" aria-hidden>
+          <ShoppingCart size={20} strokeWidth={2} />
+          <Check size={9} strokeWidth={4} className="absolute left-[8px] top-[3.5px]" />
+        </span>
+      )}
     </motion.button>
   )
 }
 
-/** Spunta con quantità: quanto ne è stato preso (default = quanto serve) entra in dispensa. */
-function BuySheet({ buying, onClose, onConfirm }: { buying: ShoppingLine | null; onClose: () => void; onConfirm: (quantity: number | null) => void }) {
-  const [seed, setSeed] = useState('')
-  const [qty, setQty] = useState('')
-  if (buying && seed !== buying.key) { setSeed(buying.key); setQty(String(buying.inPantry > 0 && buying.total > buying.inPantry ? round2(buying.total - buying.inPantry) : buying.total)) } // quanto manca, se in casa ce n'è già un po'
-  if (!buying && seed) setSeed('')
-  const n = Number(qty.replace(',', '.'))
-  const valid = qty.trim() !== '' && Number.isFinite(n) && n > 0
+const SWIPE_OPEN = 84
+
+/** Riga che si trascina verso sinistra per mostrare «elimina». */
+function SwipeRow({ children, label, onDelete }: { children: React.ReactNode; label: string; onDelete: () => void }) {
+  const x = useMotionValue(0)
+  const controls = useAnimationControls()
+  const [open, setOpen] = useState(false)
+  const reveal = useTransform(x, [-SWIPE_OPEN, -12, 0], [1, 0.2, 0])
+  const settle = (to: number) => { setOpen(to !== 0); void controls.start({ x: to, transition: { type: 'spring', stiffness: 500, damping: 40 } }) }
   return (
-    <Sheet open={!!buying} onClose={onClose} title={buying?.name ?? ''}
-      footer={<button className="glass-btn btn-primary w-full !py-3.5" disabled={!valid} onClick={() => onConfirm(n)}><Check size={16} />{t('Preso: aggiungi alla dispensa')}</button>}>
-      <p className="text-sm text-muted">{buying ? t('Servono {qty}. Quanto ne hai preso?', { qty: formatQuantity(buying.total, buying.unit) }) + (buying.inPantry > 0 ? ' ' + t('In dispensa: {qty}', { qty: formatQuantity(buying.inPantry, buying.unit) }) : '') : ''}</p>
-      <label className="label">{t('Quantità presa ({unit})', { unit: buying?.unit ?? '' })}</label>
-      <input className="field" inputMode="decimal" autoFocus value={qty} onChange={(e) => setQty(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && valid && onConfirm(n)} aria-label={t('Quantità presa')} />
-      <button className="mt-3 text-sm font-semibold text-brand" onClick={() => onConfirm(null)}>{t('Spunta senza aggiungere alla dispensa')}</button>
-    </Sheet>
+    <div className="relative">
+      <motion.div className="absolute inset-y-0 right-0 flex items-center justify-end" style={{ width: SWIPE_OPEN, opacity: reveal }}>
+        <button className="flex h-full w-[4.5rem] items-center justify-center rounded-[1.25rem] bg-exp text-onbrand" aria-label={label} tabIndex={open ? 0 : -1} onClick={onDelete}><Trash2 size={20} /></button>
+      </motion.div>
+      <motion.div drag="x" dragDirectionLock dragConstraints={{ left: -SWIPE_OPEN, right: 0 }} dragElastic={0.1} dragMomentum={false}
+        style={{ x, touchAction: 'pan-y' }} animate={controls} onDragEnd={() => settle(x.get() < -SWIPE_OPEN / 2 ? -SWIPE_OPEN : 0)}>
+        {children}
+      </motion.div>
+    </div>
   )
 }
 
