@@ -231,11 +231,11 @@ function SwipeRow({ children, label, onDelete }: { children: React.ReactNode; la
   const settle = (to: number) => { setOpen(to !== 0); void controls.start({ x: to, transition: { type: 'spring', stiffness: 500, damping: 40 } }) }
   return (
     <div className="relative">
-      <motion.div className="absolute inset-y-0 right-0 flex items-center justify-end" style={{ width: SWIPE_OPEN, opacity: reveal }}>
+      <motion.div className="absolute inset-y-0 right-0 flex items-center justify-end" style={{ width: SWIPE_OPEN, opacity: reveal, pointerEvents: open ? 'auto' : 'none' }}>
         <button className="flex h-full w-[4.5rem] items-center justify-center rounded-[1.25rem] bg-exp text-onbrand" aria-label={label} tabIndex={open ? 0 : -1} onClick={onDelete}><Trash2 size={20} /></button>
       </motion.div>
       <motion.div drag="x" dragDirectionLock dragConstraints={{ left: -SWIPE_OPEN, right: 0 }} dragElastic={0.1} dragMomentum={false}
-        style={{ x, touchAction: 'pan-y' }} animate={controls} onDragEnd={() => settle(x.get() < -SWIPE_OPEN / 2 ? -SWIPE_OPEN : 0)}>
+        className="relative z-10" style={{ x, touchAction: 'pan-y' }} animate={controls} onDragEnd={() => settle(x.get() < -SWIPE_OPEN / 2 ? -SWIPE_OPEN : 0)}>
         {children}
       </motion.div>
     </div>
