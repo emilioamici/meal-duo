@@ -1,12 +1,12 @@
 import { useMemo, useRef, useState } from 'react'
-import { Bell, Cloud, Database, FileJson, Palette, Plus, Search, ShieldCheck, Trash2, Users, Utensils } from 'lucide-react'
+import { Bell, ChevronDown, Cloud, Database, FileJson, Palette, Plus, Search, ShieldCheck, Trash2, Users, Utensils } from 'lucide-react'
 import { Accordion, ConfirmButton, PageHeader, Sheet } from '../components/ui'
 import { HeaderActions } from '../components/Chrome'
 import { MascotPeek } from '../components/Mascots'
 import { useStore } from '../state/store'
 import { useUi } from '../state/ui'
 import type { FoodCatalogItem } from '../types'
-import { deleteFood, foodUsage, liveFoods, mergeFoods, removeVariant, setVariant, updateFood } from '../services/dbOps'
+import { deleteFood, foodUsage, keepBoth, liveFoods, mergeFoods, removeVariant, setVariant, updateFood } from '../services/dbOps'
 import { variantsOf } from '../services/variants'
 import { FoodInput } from '../components/FoodInput'
 import { toBase } from '../lib/units'
@@ -86,16 +86,25 @@ function CatalogSection() {
   const [edit, setEdit] = useState<FoodCatalogItem | null>(null)
   const foods = liveFoods(db)
   const list = useMemo(() => (q.trim() ? searchFoods(foods, q, 40) : [...foods].sort((a, b) => a.name.localeCompare(b.name, 'it'))), [foods, q])
-  const dupes = useMemo(() => findDuplicatePairs(foods).slice(0, 5), [foods])
+  const allDupes = useMemo(() => findDuplicatePairs(foods), [foods])
+  const dupes = allDupes.slice(0, 5)
+  const [dupesOpen, setDupesOpen] = useState<boolean>(() => { try { return localStorage.getItem('mealduo:acc:dupes') !== '0' } catch { return true } })
+  const toggleDupes = () => { setDupesOpen(!dupesOpen); try { localStorage.setItem('mealduo:acc:dupes', dupesOpen ? '0' : '1') } catch { /* ignore */ } }
+  const { showToast } = useUi()
   const current = edit ? db.foodCatalog.find((f) => f.id === edit.id && !f.deleted) : undefined
 
   return (
     <div>
       {dupes.length > 0 && (
         <div className="mb-4 rounded-2xl border border-brand/40 bg-brand/10 p-3">
-          <p className="text-sm font-bold">{t('Possibili duplicati')}</p>
-          <p className="text-xs text-muted">{t('Unirli fa sommare correttamente le quantità nella spesa.')}</p>
-          <ul className="mt-2 space-y-2">
+          <button type="button" className="flex w-full items-center justify-between gap-2 text-left" aria-expanded={dupesOpen} onClick={toggleDupes}>
+            <span className="min-w-0">
+              <span className="block text-sm font-bold">{t('Possibili duplicati')} ({allDupes.length})</span>
+              {dupesOpen && <span className="block text-xs text-muted">{t('Unirli fa sommare correttamente le quantità nella spesa.')}</span>}
+            </span>
+            <ChevronDown size={18} className={`shrink-0 text-muted transition-transform ${dupesOpen ? 'rotate-180' : ''}`} />
+          </button>
+          {dupesOpen && <ul className="mt-2 space-y-2">
             {dupes.map(([a, b]) => (
               <li key={a.id + b.id} className="rounded-xl bg-surface p-2.5 text-sm">
                 <p className="font-semibold">«{a.name}» ≈ «{b.name}»</p>
@@ -103,9 +112,10 @@ function CatalogSection() {
                   <ConfirmButton className="!px-2 !py-1.5 !text-xs" label={t('Tieni «{name}»', { name: a.name })} confirmLabel={t('Conferma')} onConfirm={() => commit((d) => mergeFoods(d, a.id, b.id))} />
                   <ConfirmButton className="!px-2 !py-1.5 !text-xs" label={t('Tieni «{name}»', { name: b.name })} confirmLabel={t('Conferma')} onConfirm={() => commit((d) => mergeFoods(d, b.id, a.id))} />
                 </div>
+                <button type="button" className="glass-btn mt-2 w-full !px-2 !py-1.5 !text-xs" onClick={() => { commit((d) => keepBoth(d, a.id, b.id)); showToast(t('Alimenti tenuti separati')) }}>{t('Sono diversi: tieni entrambi')}</button>
               </li>
             ))}
-          </ul>
+          </ul>}
         </div>
       )}
       <div className="relative">

@@ -99,6 +99,13 @@ export function deleteFood(db: AppDatabase, id: string): AppDatabase {
   return touch({ ...db, foodCatalog }, at)
 }
 
+/** «Sono diversi»: si tengono entrambi e la coppia non viene più proposta come duplicato. */
+export function keepBoth(db: AppDatabase, aId: string, bId: string): AppDatabase {
+  if (aId === bId) return db
+  const at = nowIso()
+  return touch({ ...db, foodCatalog: db.foodCatalog.map((f) => (f.id === aId ? { ...f, distinct: [...new Set([...(f.distinct ?? []), bId])], updatedAt: at } : f)) }, at)
+}
+
 /* ---------------- Varianti ---------------- */
 
 export function setVariant(db: AppDatabase, aId: string, bId: string, amount: number, variantAmount: number): AppDatabase {

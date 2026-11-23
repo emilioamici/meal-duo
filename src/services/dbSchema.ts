@@ -66,6 +66,7 @@ export function parseDb(raw: unknown): AppDatabase {
     category: (FOOD_CATEGORIES.includes(f.category as FoodCategory) ? f.category : 'Surgelati e altro') as FoodCategory,
     aliases: Array.isArray(f.aliases) ? f.aliases.filter((a): a is string => typeof a === 'string') : undefined,
     variants: parseVariants(f.variants),
+    distinct: Array.isArray(f.distinct) && f.distinct.some((x) => typeof x === 'string') ? f.distinct.filter((x): x is string => typeof x === 'string') : undefined,
     by: by(f.by),
     updatedAt: iso(f.updatedAt),
     deleted: f.deleted === true ? true : undefined,

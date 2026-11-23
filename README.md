@@ -138,7 +138,7 @@ L'app non ha un backend: ogni utente accede con il proprio account Google e l'ap
 
 ### Impostazioni
 
-La quarta scheda della barra si chiama **Impostazioni** e ha la stessa struttura di Clean Duo (sezioni a scomparsa, con riepilogo da chiusa): **Aspetto** (sotto i due gattini: tema Mochi/Zenitsu/automatico con descrizione, e lingua), **Famiglia** (nome), **Membri della famiglia** (inviti), **Sincronizzazione e account**, **Notifiche**, **Catalogo alimenti** (con unione dei duplicati), **Piano alimentare (JSON)** e **Dati** (backup, ripristino, ricomincia da zero).
+La quarta scheda della barra si chiama **Impostazioni** e ha la stessa struttura di Clean Duo (sezioni a scomparsa, con riepilogo da chiusa): **Aspetto** (sotto i due gattini: tema Mochi/Zenitsu/automatico con descrizione, e lingua), **Famiglia** (nome), **Membri della famiglia** (inviti), **Sincronizzazione e account**, **Notifiche**, **Catalogo alimenti** (con unione dei duplicati: la sezione «Possibili duplicati» si può comprimere e, per le coppie che in realtà sono alimenti diversi, «Sono diversi: tieni entrambi» le toglie dai suggerimenti per tutta la famiglia; è salvato nel campo `distinct` dell'alimento), **Piano alimentare (JSON)** e **Dati** (backup, ripristino, ricomincia da zero).
 
 ### Chi crea la famiglia (proprietario)
 1. **Accedi con Google** → l'app cerca un database `meal-duo-db.json` che l'account può vedere.
