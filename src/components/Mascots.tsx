@@ -1,8 +1,13 @@
 import type { ReactNode } from 'react'
 
-export type Mascot = 'zenitsu' | 'mochi' | 'pair'
+export type Mascot = 'zenitsu' | 'mochi' | 'pair' | 'mochi-rice' | 'mochi-milk' | 'zenitsu-fish' | 'zenitsu-pizza' | 'pair-table'
 /** Stessi PNG di Clean Duo e MoneyDuo (public/cats). */
-const FILE: Record<Mascot, string> = { zenitsu: 'cats/zenitsu.png', mochi: 'cats/mochi.png', pair: 'cats/pair.png' }
+/** I tre PNG base sono quelli di Clean Duo e MoneyDuo, senza la fessura del salvadanaio (scripts/remove-coin-slot.py);
+ * le versioni che mangiano le genera scripts/make-eating-mascots.py. */
+const FILE: Record<Mascot, string> = {
+  zenitsu: 'cats/zenitsu.png', mochi: 'cats/mochi.png', pair: 'cats/pair.png',
+  'mochi-rice': 'cats/mochi-rice.png', 'mochi-milk': 'cats/mochi-milk.png', 'zenitsu-fish': 'cats/zenitsu-fish.png', 'zenitsu-pizza': 'cats/zenitsu-pizza.png', 'pair-table': 'cats/pair-table.png',
+}
 
 export function MascotImg({ kind, className = '' }: { kind: Mascot; className?: string }) {
   return <img src={import.meta.env.BASE_URL + FILE[kind]} alt="" draggable={false} decoding="async" className={`pointer-events-none select-none ${className}`} />

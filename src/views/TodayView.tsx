@@ -4,6 +4,7 @@ import { Check, Pencil, Plus } from 'lucide-react'
 import { PageHeader, CleanBar, EmptyCard } from '../components/ui'
 import { Fab, HeaderActions } from '../components/Chrome'
 import { MascotImg, MascotPeek } from '../components/Mascots'
+import { MealIcon } from '../components/FoodIcon'
 import { MemberPills } from '../components/MemberPills'
 import { ItemSheet, MealSheet } from '../components/Sheets'
 import { useStore } from '../state/store'
@@ -51,13 +52,16 @@ export function TodayView() {
 
       <MemberPills members={members} value={member.id} onChange={setMemberId} />
 
-      <div className="mt-3 grid grid-cols-7 gap-1.5" role="tablist" aria-label={t('Giorno della settimana')}>
+      <div className="mt-3 grid grid-cols-7 gap-1.5 pt-3" role="tablist" aria-label={t('Giorno della settimana')}>
         {DAY_INDEXES.map((d) => (
-          <button key={d} role="tab" aria-selected={day === d} onClick={() => setDay(d)}
-            className={`chip relative justify-center !px-0 ${day === d ? 'chip-active' : ''}`}>
-            {dayShort(d)}
-            {d === today && <span className={`absolute -top-0.5 right-1.5 h-1.5 w-1.5 rounded-full ${day === d ? 'bg-onbrand' : 'bg-brand'}`} aria-label={t('oggi')} />}
-          </button>
+          <div key={d} className="relative">
+            {/* il gattino fa capolino da dietro il giorno selezionato (niente puntino) */}
+            {day === d && <MascotImg kind={d % 2 ? 'zenitsu' : 'mochi'} className="absolute left-1/2 -top-[19px] h-8 w-auto -translate-x-1/2" />}
+            <button role="tab" aria-selected={day === d} onClick={() => setDay(d)} aria-label={d === today ? `${dayShort(d)} (${t('oggi')})` : undefined}
+              className={`chip relative w-full justify-center !px-0 ${day === d ? 'chip-active' : d === today ? '!font-extrabold text-brand' : ''}`}>
+              {dayShort(d)}
+            </button>
+          </div>
         ))}
       </div>
 
@@ -91,10 +95,10 @@ export function TodayView() {
                 <motion.button whileTap={{ scale: 0.82 }} role="checkbox" aria-checked={isDone(meal.id)} disabled={meal.items.length === 0 && !isDone(meal.id)}
                   aria-label={t(isDone(meal.id) ? '{name}: completato' : '{name}: da completare', { name: meal.name })} onClick={(e) => toggleMeal(e, meal.id, meal.name)}
                   className={`glass-btn !h-10 !w-10 shrink-0 !p-0 ${isDone(meal.id) ? 'btn-primary' : ''}`}>
-                  {isDone(meal.id) && <Check size={20} strokeWidth={3} />}
+                  <Check size={20} strokeWidth={3} className={isDone(meal.id) ? '' : 'opacity-30'} />
                 </motion.button>
                 <div className="min-w-0 flex-1">
-                  <h2 className={`truncate text-lg font-bold leading-tight ${isDone(meal.id) ? 'line-through' : ''}`}>{meal.name}</h2>
+                  <h2 className={`flex items-center gap-1.5 text-lg font-bold leading-tight ${isDone(meal.id) ? 'line-through' : ''}`}><MealIcon name={meal.name} size={17} className="shrink-0 text-brand" /><span className="truncate">{meal.name}</span></h2>
                   <p className="text-xs text-muted">{meal.items.length === 0 ? t('Nessun alimento') : tp(meal.items.length, '{n} alimento', '{n} alimenti', { n: meal.items.length })}</p>
                 </div>
                 <div className="flex shrink-0 gap-1.5">
@@ -119,7 +123,14 @@ export function TodayView() {
         </AnimatePresence>
 
         {meals.length === 0 && (
-          <EmptyCard mascot={<MascotImg kind="zenitsu" className="mx-auto h-20 w-auto" />} title={t('Nessun pasto per questo giorno')} text={t('Aggiungi un pasto per iniziare a pianificare.')} />
+          <EmptyCard mascot={<MascotImg kind="zenitsu-pizza" className="mx-auto h-24 w-auto" />} title={t('Nessun pasto per questo giorno')} text={t('Aggiungi un pasto per iniziare a pianificare.')} />
+        )}
+
+        {meals.length > 0 && doneCount === meals.length && (
+          <div className="card flex items-center gap-3 p-3">
+            <MascotImg kind="mochi-rice" className="h-16 w-auto shrink-0" />
+            <div><p className="font-bold">{t('Giornata completata!')}</p><p className="text-sm text-muted">{t('Hai mangiato tutto quello che avevi in programma.')}</p></div>
+          </div>
         )}
 
         <button className="glass-btn w-full" onClick={() => setMealSheet({})}><Plus size={16} />{t('Aggiungi pasto')}</button>

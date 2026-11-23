@@ -11,7 +11,7 @@ export function Gate({ reconnect = false, onLocal }: { reconnect?: boolean; onLo
     <>
       <div className="mx-auto flex min-h-dvh max-w-md flex-col justify-center px-5 py-10 pt-safe">
         <div className="mb-8 text-center">
-          <MascotImg kind="pair" className="mx-auto mb-3 w-44" />
+          <MascotImg kind="pair-table" className="mx-auto mb-3 w-48" />
           <h1 className="text-3xl font-extrabold tracking-tight">Meal <span className="text-brand">Duo</span></h1>
           <p className="mt-2 text-sm text-muted">{t('Piani alimentari e spesa di famiglia, nel tuo Google Drive.')}</p>
         </div>

@@ -84,7 +84,8 @@ src/
 └─ views/                        TodayView, WeekView, ShoppingView, SettingsView
 worker/                          Cloudflare Worker: broker OAuth (accesso persistente) + push (vedi worker/README.md)
 public/push-sw.js                gestori push/notificationclick caricati dal service worker di Workbox
-public/icons/ · public/cats/     icone PWA (da assets/icon-source.png) e mascotte (PNG condivisi con le altre app)
+public/icons/ · public/cats/     icone PWA (da assets/icon-source.png) e mascotte (PNG di Clean Duo/MoneyDuo senza la fessura + varianti che mangiano)
+scripts/                       remove-coin-slot.py (toglie la fessura dai PNG) · make-eating-mascots.py (genera i gattini che mangiano)
 scripts/generate_icons.py        genera le icone PWA
 .github/workflows/deploy.yml     test + build + deploy su GitHub Pages
 ```
@@ -319,7 +320,7 @@ I testi sono in italiano nel codice: `t('Testo italiano {nome}', { nome })` rest
 
 Dove `DESIGN_SYSTEM.md` non copriva un caso, si è scelta la soluzione più vicina allo stile esistente, senza nuovi colori o ombre.
 
-- **Mascotte uguali alle altre app.** `public/cats/{mochi,zenitsu,pair}.png` sono gli stessi file di Clean Duo e MoneyDuo (identici byte per byte). Hanno la fessura da salvadanaio sulla testa, nata per MoneyDuo; resta, come in Clean Duo, finché non ci sono varianti dedicate a Meal Duo (§4.5 del Design System).
+- **Mascotte derivate da quelle delle altre app.** `public/cats/{mochi,zenitsu,pair}.png` partono dai file di Clean Duo e MoneyDuo, ma **senza la fessura da salvadanaio** sulla testa (non c'entra con un'app di pasti): `python3 scripts/remove-coin-slot.py` la cancella ricostruendo il pelo (richiede Pillow e numpy; è pensato per i file originali, non va rilanciato sui PNG già puliti). `scripts/make-eating-mascots.py` disegna, sopra i PNG puliti, le varianti che mangiano (`mochi-rice`, `mochi-milk`, `zenitsu-fish`, `zenitsu-pizza`, `pair-table`), usate negli stati vuoti, nella schermata di accesso e quando si completano giornata o spesa.
 - **Fogli come in MoneyDuo:** portal su `document.body` (nessun antenato con transform/overflow), pagina sotto bloccata mentre sono aperti, `max-h-[92dvh]`, **azione principale nel footer** e, con la tastiera aperta, altezza e posizione calcolate dal visual viewport così il foglio resta sopra la tastiera (anche su iOS, dove la tastiera non ridimensiona la pagina). Il FAB resta in un portal su `#shell-overlay` (le pagine animate con `filter: blur()` creano un containing block, §2.2). La catena di altezze `html → #root → cornice` deve avere sempre `h-full`: un `div` senza altezza in mezzo fa scorrere tutto il documento e la barra in basso sparisce.
 - **Colori membro**: tavolozza di 8 colori caldi/neutri presi dalle palette membro e stanza del documento; usati solo come dato scelto dall'utente (§0.2). I badge per-membro sulla spesa usano testo `ink` su `bg-bg` con un puntino colorato (mai testo colorato su fondo colorato).
 - **Celebrazione** a stelle (§3.3) al completamento della spesa, con haptic dove disponibile.
@@ -355,6 +356,6 @@ Verificata con Playwright (iPhone 14, tema chiaro e scuro) e ispezione del codic
 - Con `drive.file` il secondo membro deve usare il Picker (§4).
 - L'accesso persistente richiede il Worker e un account Cloudflare protetto: custodisce un token di rinnovo con accesso a Drive (vedi `worker/README.md`).
 - Il push ad app chiusa non è stato provato su dispositivi reali (iOS/Android): è coperto da test su cifratura, VAPID e service worker.
-- Le mascotte sono quelle condivise con Clean Duo e MoneyDuo (con la fessura da salvadanaio); l'icona PWA è definitiva.
+- Le mascotte derivano da quelle di Clean Duo e MoneyDuo (senza la fessura da salvadanaio); le varianti che mangiano sono disegnate a codice, non illustrate a mano; l'icona PWA è definitiva.
 - I token GIS durano ~1 ora: se scade e il rinnovo silenzioso è bloccato dal browser, la pillola mostra «Accedi» e basta un tocco.
 - `headRevisionId`/`version` rilevano le modifiche altrui ma non c'è locking: vedi la nota sulla finestra di race in §5.

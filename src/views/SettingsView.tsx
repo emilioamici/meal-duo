@@ -9,6 +9,7 @@ import type { FoodCatalogItem } from '../types'
 import { deleteFood, foodUsage, keepBoth, liveFoods, mergeFoods, removeVariant, setVariant, updateFood } from '../services/dbOps'
 import { variantsOf } from '../services/variants'
 import { FoodInput } from '../components/FoodInput'
+import { CategoryIcon } from '../components/FoodIcon'
 import { toBase } from '../lib/units'
 import { parseDb } from '../services/dbSchema'
 import { findDuplicatePairs, FOOD_CATEGORIES, normalizeName, searchFoods } from '../lib/foodMatch'
@@ -126,7 +127,10 @@ function CatalogSection() {
         {list.map((f) => (
           <li key={f.id}>
             <button className="flex w-full items-center justify-between gap-3 py-2.5 text-left active:bg-line/30" onClick={() => setEdit(f)}>
-              <span className="min-w-0"><span className="block truncate font-semibold leading-tight">{f.name}</span><span className="block text-xs text-muted">{t(f.category)} · {f.unit}</span></span>
+              <span className="flex min-w-0 items-center gap-3">
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand/10 text-brand"><CategoryIcon category={f.category} size={16} /></span>
+                <span className="min-w-0"><span className="block truncate font-semibold leading-tight">{f.name}</span><span className="block text-xs text-muted">{t(f.category)} · {f.unit}</span></span>
+              </span>
               <span className="shrink-0 rounded-full bg-line/60 px-2 py-0.5 text-[11px] font-semibold">{tp(foodUsage(db, f.id), '{n} uso', '{n} usi', { n: foodUsage(db, f.id) })}</span>
             </button>
           </li>
