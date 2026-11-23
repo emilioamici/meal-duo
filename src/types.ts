@@ -41,6 +41,8 @@ export interface FoodCatalogItem extends Versioned {
   aliases?: string[]
   /** varianti: altri alimenti del catalogo che lo sostituiscono con un fattore di conversione */
   variants?: FoodVariant[]
+  /** alimenti che l'utente ha confermato essere diversi da questo (non si propongono più come duplicati) */
+  distinct?: string[]
 }
 
 /** «`amount` di questo alimento = `variantAmount` dell'alimento `foodId`» (es. 100 g di pasta = 120 g di riso), ognuno nella propria unità del catalogo. */

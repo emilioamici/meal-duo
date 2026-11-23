@@ -125,6 +125,7 @@ export function findDuplicatePairs(catalog: FoodCatalogItem[]): [FoodCatalogItem
     for (let j = i + 1; j < live.length; j++) {
       const a = live[i]
       const b = live[j]
+      if (a.distinct?.includes(b.id) || b.distinct?.includes(a.id)) continue // «lascia entrambi»
       const ta = tokens(a.name)
       const tb = tokens(b.name)
       const subset = (x: string[], y: string[]) => x.length > 0 && x.every((t) => y.includes(t))

@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import { findCanonical, findDuplicatePairs, guessCategory, normalizeName, searchFoods } from './foodMatch'
 import type { FoodCatalogItem } from '../types'
+import { fixtureDb } from '../test-helpers'
+import { keepBoth } from '../services/dbOps'
+import { parseDb } from '../services/dbSchema'
+import { mergeDatabases } from '../services/merge'
 
 const f = (id: string, name: string, aliases?: string[]): FoodCatalogItem => ({ id, name, unit: 'g', category: 'Dispensa', updatedAt: '', aliases })
 const cat = [f('1', 'Petto di pollo'), f('2', 'Riso basmati'), f('3', 'Olio EVO'), f('4', 'Uova'), f('5', 'Pomodori'), f('6', 'Cosce di pollo'), f('7', 'Yogurt greco', ['yogurt'])]
@@ -63,5 +67,21 @@ describe('duplicati e categorie', () => {
     expect(guessCategory('Parmigiano Reggiano')).toBe('Latticini e uova')
     expect(guessCategory('Riso basmati')).toBe('Pane, pasta e cereali')
     expect(guessCategory('Olio EVO')).toBe('Dispensa')
+  })
+})
+
+describe('«sono diversi: tieni entrambi»', () => {
+  const foods = (): FoodCatalogItem[] => ['Salmone', 'Salmone affumicato', 'Riso', 'Farina di riso'].map((name, i) => ({ id: `f${i}`, name, unit: 'g', category: 'Dispensa', updatedAt: '2026-01-01T00:00:00.000Z' }))
+  it('la coppia segnata come diversa non viene più proposta, le altre sì', () => {
+    const db = { ...fixtureDb(), foodCatalog: foods() }
+    expect(findDuplicatePairs(db.foodCatalog).map(([a, b]) => `${a.name}|${b.name}`)).toEqual(['Salmone|Salmone affumicato', 'Riso|Farina di riso'])
+    const out = keepBoth(db, 'f0', 'f1')
+    expect(findDuplicatePairs(out.foodCatalog).map(([a, b]) => `${a.name}|${b.name}`)).toEqual(['Riso|Farina di riso'])
+    expect(out.foodCatalog.filter((f) => !f.deleted)).toHaveLength(4) // nessun alimento viene toccato
+  })
+  it('vale in entrambi i sensi, sopravvive a parseDb e al merge tra dispositivi', () => {
+    const db = keepBoth({ ...fixtureDb(), foodCatalog: foods() }, 'f1', 'f0')
+    expect(findDuplicatePairs(parseDb(JSON.parse(JSON.stringify(db))).foodCatalog).map(([a]) => a.name)).toEqual(['Riso'])
+    expect(findDuplicatePairs(mergeDatabases(db, { ...db, foodCatalog: foods() }).foodCatalog)).toHaveLength(1)
   })
 })

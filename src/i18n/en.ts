@@ -438,4 +438,6 @@ export const EN: Record<string, string> = {
   "\"variants\" (facoltativo) elenca gli alimenti che si sostituiscono con il fattore di conversione: {\"from\": {\"name\": \"Pasta\", \"quantity\": 100, \"unit\": \"g\"}, \"to\": {\"name\": \"Riso\", \"quantity\": 120, \"unit\": \"g\"}} significa 100 g di pasta = 120 g di riso (vale nei due sensi). Si può importare anche da solo, senza \"days\".": "\"variants\" (optional) lists foods that replace each other with a conversion factor: {\"from\": {\"name\": \"Pasta\", \"quantity\": 100, \"unit\": \"g\"}, \"to\": {\"name\": \"Rice\", \"quantity\": 120, \"unit\": \"g\"}} means 100 g of pasta = 120 g of rice (it works both ways). It can also be imported on its own, without \"days\".",
   "Variante saltata · {m}": "Variant skipped · {m}",
   "\"variants\" deve essere un array di varianti: ignorato.": "\"variants\" must be an array of variants: ignored.",
+  "Sono diversi: tieni entrambi": "They're different: keep both",
+  "Alimenti tenuti separati": "Foods kept separate",
 }
