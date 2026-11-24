@@ -157,7 +157,9 @@ export function FamilyCard() {
             <input readOnly className="field font-mono !text-xs" value={sync.fileId} aria-label={t('ID famiglia')} onFocus={(e) => e.currentTarget.select()} />
             <button className="glass-btn !h-11 !w-11 shrink-0 !p-0" aria-label={t('Copia ID')} onClick={() => { void navigator.clipboard?.writeText(sync.fileId!); setCopied(true); setTimeout(() => setCopied(false), 1500) }}>{copied ? <Check size={16} /> : <Copy size={16} />}</button>
           </div>
-          <p className="mt-1.5 px-1 text-xs text-muted">{t('Il codice da dare a chi entra: dopo l’invito lo incolla all’accesso come «ID famiglia».')}</p>
+          <p className="mt-1.5 px-1 text-xs text-muted">{sync.bridgeRegAt
+            ? t('Il codice basta: chi lo riceve (o apre il link d’invito) entra da solo, senza che tu inserisca la sua email. È un segreto condiviso: chi lo conosce può entrare, e togliere una persona da Drive non basta se ha ancora il codice.')
+            : t('Il codice da solo non basta finché la famiglia non è collegata al server (servono l’accesso persistente e il Worker aggiornato): per ora invita le persone con la loro email, poi daranno il codice o apriranno il link.')}</p>
         </div>
       )}
       {err && <p role="alert" className="mt-3 rounded-xl bg-exp/15 p-3 text-sm"><span className="font-bold text-exp">{t('Errore:')} </span>{err}</p>}

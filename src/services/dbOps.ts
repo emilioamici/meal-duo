@@ -13,7 +13,10 @@ import { withVariant, withoutVariant } from './variants'
 export const DEFAULT_MEALS = ['Colazione', 'Spuntino mattina', 'Pranzo', 'Merenda', 'Cena']
 export const MEMBER_COLORS = ['#c9692a', '#2a8f78', '#c0506a', '#e0a93e', '#8a5fa8', '#3f87b8', '#6aa84f', '#5b6577']
 
-export const EPOCH = '2026-01-01T00:00:00.000Z'
+/** Data dei record segnaposto (demo, copia locale vuota): antica di proposito, così nel merge vince sempre il contenuto di Drive. */
+export const EPOCH = '2000-01-01T00:00:00.000Z'
+/** Valore usato fino alla versione precedente: i dati già salvati sui dispositivi lo hanno ancora. */
+const LEGACY_EPOCH = '2026-01-01T00:00:00.000Z'
 
 export function emptyDay(at: string = nowIso(), meals: string[] = DEFAULT_MEALS): DayPlan {
   return { updatedAt: at, meals: meals.map((name) => ({ id: uid('meal'), name, items: [] })) }
@@ -45,7 +48,7 @@ export function emptyDb(houseName = 'La nostra famiglia', memberName = 'Io', ema
 const touch = (db: AppDatabase, at: string): AppDatabase => ({ ...db, lastUpdated: at })
 
 /** Il database è ancora quello di esempio / mai modificato (lastUpdated resta all'epoca). */
-export const isPristine = (db: AppDatabase): boolean => db.lastUpdated === EPOCH
+export const isPristine = (db: AppDatabase): boolean => db.lastUpdated === EPOCH || db.lastUpdated === LEGACY_EPOCH
 
 export const liveMembers = (db: AppDatabase): Member[] => db.members.filter((m) => !m.deleted)
 export const liveFoods = (db: AppDatabase): FoodCatalogItem[] => db.foodCatalog.filter((f) => !f.deleted)

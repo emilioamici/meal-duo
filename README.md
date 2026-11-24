@@ -157,9 +157,9 @@ Per **rimuovere** una persona: Membri → Modifica → *Rimuovi membro*: il prop
 ### ID famiglia, link d'invito e accesso senza Picker
 Con lo scope `drive.file` Drive nega l'accesso (`404`) ai file creati da altri **anche se condivisi con te**, finché quell'app non li ha «aperti». Meal Duo usa **sempre e solo** `drive.file` e lo risolve come Clean Duo:
 
-- **ID famiglia**: è l'ID del file su Drive. Il proprietario lo copia da *Impostazioni → Famiglia*; chi entra può incollarlo in «ID famiglia» nella schermata di collegamento.
+- **ID famiglia = codice**: è l'ID del file su Drive. Il proprietario lo copia da *Impostazioni → Famiglia*; chi entra lo incolla in «ID famiglia» nella schermata di collegamento (o apre il link `#join`). Con il ponte attivo **il codice basta**: il Worker aggiunge l'account tra gli scrittori del file (`/house/join`). ⚠ È un segreto condiviso: chi lo conosce può entrare, e togliere una persona da Drive non basta se ha ancora il codice (se trapela, si crea una nuova famiglia).
 - **Link d'invito**: l'email d'invito contiene un link `…#join=<ID famiglia>`; aprendolo (e accedendo) la famiglia si apre da sola.
-- **Ponte del Worker**: se il Worker è attivo, chi ha creato la famiglia la registra sul Worker (serve l'accesso persistente). Gli invitati, anche senza Picker né ID, leggono e scrivono il database **passando dal Worker**, che verifica a ogni richiesta che l'email sia tra i permessi del file su Drive (e con ruolo di scrittura per modificare). Togliere una persona da Drive le chiude subito anche il ponte.
+- **Ponte del Worker**: se il Worker è attivo, chi ha creato la famiglia la registra sul Worker (serve l'accesso persistente). Gli invitati (per email o con il codice), senza Picker, leggono e scrivono il database **passando dal Worker**, che verifica a ogni richiesta che l'email sia tra i permessi del file su Drive (e con ruolo di scrittura per modificare). Togliere una persona da Drive le chiude subito anche il ponte (ma con il codice può rientrare). Dettagli, sicurezza e deploy: `worker/README.md`.
 - **Senza ponte**: resta il Picker di Google, ristretto a quel solo file.
 
 ---

@@ -52,11 +52,11 @@ async function login(): Promise<{ sid: string; location: string }> {
 }
 
 describe('/auth/start', () => {
-  it('con scope=file chiede solo il permesso ristretto drive.file', async () => {
-    const r = await get(`/auth/start?return=${encodeURIComponent(APP)}&scope=file`)
-    expect(new URL(r.headers.get('Location')!).searchParams.get('scope')).toBe('https://www.googleapis.com/auth/drive.file')
-    const other = await get(`/auth/start?return=${encodeURIComponent(APP)}&scope=qualunque`)
-    expect(new URL(other.headers.get('Location')!).searchParams.get('scope')).toBe('https://www.googleapis.com/auth/drive')   // valori sconosciuti: come prima
+  it('chiede sempre e solo il permesso ristretto drive.file, qualunque `scope` arrivi dall\'app', async () => {
+    for (const q of ['&scope=file', '', '&scope=full', '&scope=qualunque']) {
+      const r = await get(`/auth/start?return=${encodeURIComponent(APP)}${q}`)
+      expect(new URL(r.headers.get('Location')!).searchParams.get('scope')).toBe('https://www.googleapis.com/auth/drive.file')
+    }
   })
   it('reindirizza a Google chiedendo il token di rinnovo e il consenso', async () => {
     const r = await get(`/auth/start?return=${encodeURIComponent(APP)}&hint=emilio@example.com`)
@@ -65,7 +65,7 @@ describe('/auth/start', () => {
     expect(u.origin + u.pathname).toBe('https://accounts.google.com/o/oauth2/v2/auth')
     expect(Object.fromEntries(u.searchParams)).toMatchObject({
       client_id: env.GOOGLE_CLIENT_ID, redirect_uri: `${WORKER}/auth/callback`, response_type: 'code', access_type: 'offline', prompt: 'consent',
-      scope: 'https://www.googleapis.com/auth/drive', login_hint: 'emilio@example.com',
+      scope: 'https://www.googleapis.com/auth/drive.file', login_hint: 'emilio@example.com',
     })
     expect(kv.data.get(`st:${u.searchParams.get('state')}`)).toBe(APP)
   })
@@ -183,8 +183,8 @@ describe('/auth/logout e /health', () => {
     expect(vi.mocked(fetch).mock.calls.some(([u]) => String(u).includes('/revoke'))).toBe(false) // non si revoca su Google: scollegherebbe gli altri dispositivi
   })
   it('/health dice se l\'accesso persistente è configurato', async () => {
-    expect(await (await get('/health')).json()).toEqual({ ok: true, auth: true, bridge: true })
+    expect(await (await get('/health')).json()).toMatchObject({ ok: true, auth: true, bridge: true })
     env.SESSION_KEY = undefined
-    expect(await (await get('/health')).json()).toEqual({ ok: true, auth: false, bridge: false })
+    expect(await (await get('/health')).json()).toMatchObject({ ok: true, auth: false, bridge: false })
   })
 })

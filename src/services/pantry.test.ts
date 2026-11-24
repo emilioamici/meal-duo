@@ -228,6 +228,16 @@ describe('varianti', () => {
   })
 })
 
+describe('copia segnaposto', () => {
+  it('i dati demo e vuoti hanno data antica (anno 2000) e i dati già salvati con la vecchia data restano «intatti»', async () => {
+    const { isPristine, EPOCH } = await import('./dbOps')
+    expect(EPOCH.startsWith('2000-')).toBe(true)
+    expect(isPristine({ ...fixtureDb(), lastUpdated: EPOCH })).toBe(true)
+    expect(isPristine({ ...fixtureDb(), lastUpdated: '2026-01-01T00:00:00.000Z' })).toBe(true) // salvata dalla versione precedente
+    expect(isPristine({ ...fixtureDb(), lastUpdated: '2026-11-24T10:00:00.000Z' })).toBe(false)
+  })
+})
+
 describe('persistenza', () => {
   it('parseDb conserva dispensa e varianti; un database senza dispensa si apre vuoto', () => {
     let db = setVariant(fixtureDb(), 'riso', 'latte', 100, 100)

@@ -54,9 +54,9 @@ export function ConnectFlow({ active, reconnect = false, onClose, allowLocal = f
     done(t('Famiglia collegata'))
   }
 
-  /** Apre la famiglia: accesso diretto → ponte → (un tocco sul) Selettore ristretto a quel file. */
-  const openFamily = async (id: string) => {
-    try { await finishOpen(await engine.resolveFamily(id)) } catch (e) {
+  /** Apre la famiglia: accesso diretto → ponte (con il codice: prima l'unione) → (un tocco sul) Selettore ristretto a quel file. `viaCode` = l'utente ha presentato il codice (ID digitato o link d'invito). */
+  const openFamily = async (id: string, viaCode = false) => {
+    try { await finishOpen(await engine.resolveFamily(id, false, viaCode)) } catch (e) {
       if (e instanceof NeedsPickerError) { setInviteId(id); return setPhase('invite') }
       throw e
     }
@@ -67,7 +67,7 @@ export function ConnectFlow({ active, reconnect = false, onClose, allowLocal = f
     try {
       if (!sync.email || !sync.name) await engine.loadProfile()
       const inv = pendingInvite()
-      if (inv) return await openFamily(inv)
+      if (inv) return await openFamily(inv, true) // il link d'invito è il codice
       const list = await engine.listFamilies()
       setFamilies(list)
       if (list.length === 1) return await openFamily(list[0].id) // una sola famiglia: collegamento automatico
@@ -142,7 +142,7 @@ export function ConnectFlow({ active, reconnect = false, onClose, allowLocal = f
         <>
           <h2 className="text-lg font-bold">{t('Ti hanno invitato in una famiglia')}</h2>
           <p className="mt-1 text-sm text-muted">{t('Per entrare tocca il pulsante e conferma il file della famiglia: serve a dare a Meal Duo il permesso di aprirlo. Si fa una volta sola.')}</p>
-          <button className="glass-btn btn-primary mt-4 w-full !py-3" disabled={busy} onClick={() => void guard(async () => { try { await finishOpen(await engine.resolveFamily(inviteId, true)) } catch (e) { if (!(e instanceof NeedsPickerError)) throw e } })}>
+          <button className="glass-btn btn-primary mt-4 w-full !py-3" disabled={busy} onClick={() => void guard(async () => { try { await finishOpen(await engine.resolveFamily(inviteId, true, true)) } catch (e) { if (!(e instanceof NeedsPickerError)) throw e } })}>
             {busy ? <Loader2 size={18} className="animate-spin" /> : <Folder size={18} />}{t('Scegli il file e unisciti')}
           </button>
           <p className="mt-2 text-xs text-muted">{t('Se compare «Can’t access your Google Account», in Safari consenti i cookie per questo sito oppure chiedi a chi ti ha invitato di attivare l’accesso persistente: così entri senza questo passaggio.')}</p>
@@ -167,7 +167,7 @@ export function ConnectFlow({ active, reconnect = false, onClose, allowLocal = f
             <p className="flex items-center gap-2 text-sm font-semibold"><Link2 size={16} className="text-brand" />{t('Entra in una famiglia con l’ID famiglia')}</p>
             <p className="text-xs text-muted">{t('Chi ha creato la famiglia ti manda il suo ID famiglia (lo trova in Impostazioni → Famiglia): incollalo qui. Se ti ha invitato per email, basta aprire il link dell’invito.')}</p>
             <input className="field font-mono !text-xs" placeholder={t('ID famiglia')} value={joinId} onChange={(e) => setJoinId(e.target.value)} autoCapitalize="none" autoCorrect="off" spellCheck={false} aria-label={t('ID famiglia')} />
-            <button className="glass-btn btn-primary w-full" disabled={busy || !parseFileId(joinId)} onClick={() => void guard(() => openFamily(parseFileId(joinId)!))}>
+            <button className="glass-btn btn-primary w-full" disabled={busy || !parseFileId(joinId)} onClick={() => void guard(() => openFamily(parseFileId(joinId)!, true))}>
               {busy ? <Loader2 size={18} className="animate-spin" /> : <Folder size={18} />}{t('Entra')}
             </button>
           </div>
