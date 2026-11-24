@@ -4,6 +4,7 @@ import { Sheet, EmptyCard, ConfirmButton } from './ui'
 import { FoodInput } from './FoodInput'
 import { Fab } from './Chrome'
 import { MascotImg } from './Mascots'
+import { CategoryIcon } from './FoodIcon'
 import { useStore } from '../state/store'
 import { useUi } from '../state/ui'
 import { ensureFood, foodById, liveFoods, setPantryQuantity } from '../services/dbOps'
@@ -22,16 +23,19 @@ export function PantryPanel({ fabOpen }: { fabOpen: boolean }) {
     <>
       <div className="mt-3 space-y-2">
         {list.length === 0 && (
-          <EmptyCard mascot={<MascotImg kind="mochi" className="mx-auto h-16 w-auto" />} title={t('Dispensa vuota')}
+          <EmptyCard mascot={<MascotImg kind="zenitsu-fish" className="mx-auto h-20 w-auto" />} title={t('Dispensa vuota')}
             text={t('Si riempie quando spunti un articolo nella lista della spesa e si svuota quando completi un pasto.')} />
         )}
         <ul className="space-y-2">
           {list.map((e) => (
             <li key={`${e.foodId}|${e.unit}`}>
               <button className="card flex w-full items-center justify-between gap-3 p-3 text-left active:bg-line/30" onClick={() => setEdit(e)} aria-label={t('Modifica {name} in dispensa', { name: e.name })}>
-                <span className="min-w-0">
-                  <span className="block truncate font-semibold leading-tight">{e.name}</span>
-                  <span className="block text-xs text-muted">{t(e.category)}</span>
+                <span className="flex min-w-0 items-center gap-3">
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand/10 text-brand"><CategoryIcon category={e.category} size={18} /></span>
+                  <span className="min-w-0">
+                    <span className="block truncate font-semibold leading-tight">{e.name}</span>
+                    <span className="block text-xs text-muted">{t(e.category)}</span>
+                  </span>
                 </span>
                 <span className="shrink-0 font-extrabold">{formatQuantity(e.quantity, e.unit)}</span>
               </button>

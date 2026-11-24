@@ -4,9 +4,10 @@ import { Check, Plus, RotateCcw, ShoppingCart, SlidersHorizontal, Trash2, X } fr
 import { PageHeader, CleanBar, Segmented, Sheet, ConfirmButton, EmptyCard, Avatar, Accordion } from '../components/ui'
 import { Fab, HeaderActions } from '../components/Chrome'
 import { MascotImg, MascotPeek } from '../components/Mascots'
+import { CategoryIcon } from '../components/FoodIcon'
 import { useStore } from '../state/store'
 import { useUi } from '../state/ui'
-import { DAY_INDEXES, type DayIndex, type ExtraItem, type Member, type ShoppingLine } from '../types'
+import { DAY_INDEXES, type DayIndex, type ExtraItem, type FoodCategory, type Member, type ShoppingLine } from '../types'
 import { buildShoppingList, extraChecked, groupByCategory, liveExtras, shoppingProgress } from '../services/shoppingListEngine'
 import { addExtra, checkLine, hideLine, removeExtra, resetShopping, restoreLines, setPurchaseQuantity, toggleExtra, uncheckLine } from '../services/dbOps'
 import { PantryPanel } from '../components/PantryPanel'
@@ -82,7 +83,9 @@ export function ShoppingView() {
               <p className="text-4xl font-extrabold leading-none">{remaining}</p>
               <p className="mt-1 text-sm text-muted">{t('articoli da comprare')}{excludedCount > 0 && <span className="font-semibold text-brand"> {t('· filtri attivi')}</span>}</p>
             </div>
-            <p className="text-sm font-semibold text-muted">{progress.done}/{progress.total}</p>
+            {remaining === 0 && progress.total > 0
+              ? <MascotImg kind="zenitsu-fish" className="-my-2 h-16 w-auto" />
+              : <p className="text-sm font-semibold text-muted">{progress.done}/{progress.total}</p>}
           </div>
           <div className="mt-3"><CleanBar pct={progress.pct} height={10} /></div>
         </div>
@@ -124,12 +127,12 @@ export function ShoppingView() {
       {/* ---- Lista aggregata ---- */}
       <div className="mt-3 space-y-3">
         {lines.length === 0 && (
-          <EmptyCard mascot={<MascotImg kind="mochi" className="mx-auto h-16 w-auto" />} title={t('Niente da comprare')}
+          <EmptyCard mascot={<MascotImg kind="mochi-rice" className="mx-auto h-20 w-auto" />} title={t('Niente da comprare')}
             text={excludedCount > 0 ? t('I filtri attuali escludono tutti i piani: riattiva qualche membro o giorno.') : t('Aggiungi alimenti ai piani per generare la spesa.')} />
         )}
         {sections.map((s) => (
           <div key={s.category || 'all'}>
-            {s.category && <h2 className="mb-2 mt-1 px-1 text-xs font-semibold uppercase tracking-wide text-muted">{t(s.category)}</h2>}
+            {s.category && <h2 className="mb-2 mt-1 flex items-center gap-1.5 px-1 text-xs font-semibold uppercase tracking-wide text-muted"><CategoryIcon category={s.category as FoodCategory} size={14} className="text-brand" />{t(s.category)}</h2>}
             <ul className="space-y-2">
               <AnimatePresence initial={false}>
                 {s.lines.map((l) => (
@@ -139,7 +142,7 @@ export function ShoppingView() {
                         <CheckButton checked={l.checked} label={t(l.checked ? '{name}: da comprare' : '{name}: preso', { name: l.name })} onClick={(e) => onToggleLine(e, l)} />
                         <div className="min-w-0 flex-1 pt-0.5">
                           <div className="flex items-center justify-between gap-3">
-                            <span className={`min-w-0 truncate font-semibold leading-tight ${l.checked ? 'line-through' : ''}`}>{l.name}</span>
+                            <span className={`flex min-w-0 items-center gap-1.5 font-semibold leading-tight ${l.checked ? 'line-through' : ''}`}><CategoryIcon category={l.category} size={15} className="shrink-0 text-brand/70" /><span className="truncate">{l.name}</span></span>
                             <span className="flex shrink-0 items-baseline gap-1">
                               <input className="w-[4.5rem] rounded-xl border border-line bg-bg px-2 py-1 text-right font-extrabold" inputMode="decimal" value={shownQty(l)} aria-label={t('Quantità di {name}', { name: l.name })}
                                 onPointerDown={(e) => e.stopPropagation()} onFocus={(e) => e.currentTarget.select()}

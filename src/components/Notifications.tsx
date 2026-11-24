@@ -34,7 +34,7 @@ export function NotificationCenter() {
     <Sheet open={centerOpen} onClose={() => setCenterOpen(false)} title={t('Notifiche')}>
       {notifications.length === 0 ? (
         <div className="py-10 text-center text-sm text-muted">
-          <MascotImg kind="mochi" className="mx-auto mb-3 h-20 w-auto" />
+          <MascotImg kind="mochi-milk" className="mx-auto mb-3 h-24 w-auto" />
           <p className="font-semibold text-ink">{t('Nessuna notifica')}</p>
           <p className="mx-auto mt-1 max-w-xs">{t('Ti avviso quando un altro membro aggiunge una voce alla spesa, spunta un articolo o modifica il tuo piano.')}</p>
         </div>

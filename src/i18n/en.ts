@@ -440,4 +440,5 @@ export const EN: Record<string, string> = {
   "\"variants\" deve essere un array di varianti: ignorato.": "\"variants\" must be an array of variants: ignored.",
   "Sono diversi: tieni entrambi": "They're different: keep both",
   "Alimenti tenuti separati": "Foods kept separate",
+  "Hai mangiato tutto quello che avevi in programma.": "You ate everything you had planned.",
 }
