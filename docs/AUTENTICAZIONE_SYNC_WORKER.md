@@ -82,11 +82,14 @@ Sempre e solo `https://www.googleapis.com/auth/drive.file` (non sensibile: nessu
 ### 3.4 Ponte del Worker (condivisione senza Picker)
 Con `drive.file` un invitato non vede il file creato da altri. Il Worker fa da ponte, come in Clean Duo:
 
-1. Chi ha creato la famiglia (ruolo `owner`, con sessione persistente) la registra: `POST /house/register`. Si ripete ogni 3 giorni e subito dopo ogni invito.
-2. Un invitato chiede `GET /house/mine` e riceve le famiglie che gli sono state condivise; poi legge con `/db/meta` e `/db/read` e scrive con `/db/write` (con `expectedVersion`: se il file è cambiato risponde `409` e il client rifà il merge).
-3. A ogni chiamata il Worker usa il refresh token del proprietario per leggere i permessi del file e controlla che l'email del chiamante sia presente, con token emesso per il tuo `GOOGLE_CLIENT_ID` (`ALLOWED_CLIENT_IDS` è facoltativa, per altri Client ID). **Per scrivere serve il ruolo owner/writer** (differenza voluta rispetto a Clean Duo). Il contenuto transita dal Worker ma non vi è conservato.
+1. Chi ha creato la famiglia (ruolo `owner`, con sessione persistente) la registra: `POST /house/register`. Si ripete ogni 3 giorni e subito dopo ogni invito (ordine: prima si condivide il file con l'email, poi si registra).
+2. **Il codice è l'ID del file.** `POST /house/join {fileId}`: il Worker, con l'accesso del proprietario, aggiunge chi lo presenta tra gli scrittori (senza email, max 20 account; chi ha già un permesso non viene toccato). L'app lo chiama **solo** quando l'utente presenta il codice (ID digitato o link `#join`), mai da sola.
+3. Un invitato per email chiede `POST /house/mine` e riceve le famiglie condivise con lui (una sola e nessun file collegato → si collega da sola); poi legge con `/db/meta` e `/db/read` e scrive con `/db/write` (con `expectedVersion`: se il file è cambiato risponde `409` e il client rifà il merge).
+4. A ogni richiesta il Worker verifica il token (`tokeninfo`: emesso per il tuo `GOOGLE_CLIENT_ID`, solo `drive.file`; identità in cache al più 60 s) e rilegge i permessi del file con il refresh token del proprietario. **Per scrivere serve il ruolo owner/writer** (differenza voluta rispetto a Clean Duo). Il contenuto transita dal Worker ma non vi è conservato.
 
-Il link d'invito e l'ID famiglia (`src/sync/invite.ts`, chiave `mealduo:joinId`) servono a chi accede dal ponte o dal Picker ristretto.
+**Ordine di collegamento a un file altrui** (`engine.resolveFamily`): accesso diretto → ponte (lettura; se non ancora condiviso e c'è il codice, prima `/house/join`) → Selettore ristretto a quel file (serve un tocco, mai in automatico) → errore con la causa. Un Worker vecchio senza `/house/join` fa proseguire con il Selettore.
+
+**Compromesso:** il codice è un segreto condiviso: chi lo conosce entra, e l'ID non si può cambiare. Togliere una persona da Drive chiude subito il ponte per lei, ma con il codice può rientrare. Il link `#join` e l'ID famiglia (`src/sync/invite.ts`, chiave `mealduo:joinId`, cancellata dopo ogni collegamento riuscito) sono lo stesso codice.
 
 ---
 

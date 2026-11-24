@@ -1,4 +1,5 @@
 import { HttpError, readJson, validFileId, authenticate, type Env } from './index'
+import { bearerOf, verifyToken } from './identity'
 import { authConfigured, seal, unseal } from './auth'
 
 /**
@@ -54,37 +55,18 @@ export async function permissionsOf(env: Env, token: string, fileId: string): Pr
   return ((await r.json()) as { permissions?: Perm[] }).permissions ?? []
 }
 
-const clientIds = (env: Env): string[] => [env.GOOGLE_CLIENT_ID, ...(env.ALLOWED_CLIENT_IDS ?? '').split(',')].map((s) => (s ?? '').trim()).filter(Boolean)
-
-/** Il token è stato emesso per questa app? (senza controllo sul file basterebbe un token qualsiasi dello stesso utente) */
-async function issuedForApp(env: Env, token: string): Promise<boolean> {
-  const r = await fetch(`${oauth(env)}/tokeninfo?access_token=${encodeURIComponent(token)}`)
-  if (!r.ok) return false
-  const j = (await r.json()) as { aud?: string; azp?: string }
-  const ids = clientIds(env)
-  return ids.includes(j.aud ?? '') || ids.includes(j.azp ?? '')
-}
-
-/** Per `authenticate`: chi non ha accesso diretto al file può comunque passare se la famiglia è registrata e il file è condiviso con lui. */
-export async function bridgeAccess(env: Env, token: string, email: string, fileId: string): Promise<boolean> {
+/** Per `authenticate` (che ha già verificato il token): chi non ha accesso diretto al file passa se la famiglia è registrata e il file è condiviso con lui. */
+export async function bridgeAccess(env: Env, email: string, fileId: string): Promise<boolean> {
   if (!bridgeEnabled(env)) return false
   const house = await loadHouse(env, fileId)
   if (!house) return false
-  if (!(await issuedForApp(env, token))) return false
   const perms = await permissionsOf(env, await houseToken(env, fileId, house), fileId)
   return perms.some((p) => p.emailAddress?.toLowerCase() === email.toLowerCase())
 }
 
 async function whoami(env: Env, req: Request): Promise<{ token: string; email: string }> {
-  const token = /^Bearer (.+)$/.exec(req.headers.get('Authorization') ?? '')?.[1]
-  if (!token) throw new HttpError(401, 'Accesso mancante')
-  const r = await fetch(`${google(env)}/drive/v3/about?fields=user(emailAddress)`, { headers: { Authorization: `Bearer ${token}` } })
-  if (r.status === 401) throw new HttpError(401, 'Sessione Google non valida o scaduta')
-  if (!r.ok) throw new HttpError(502, 'Google non risponde')
-  const email = ((await r.json()) as { user?: { emailAddress?: string } }).user?.emailAddress
-  if (!email) throw new HttpError(401, 'Account Google non riconosciuto')
-  if (!(await issuedForApp(env, token))) throw new HttpError(403, 'Token non emesso per questa app')
-  return { token, email: email.toLowerCase() }
+  const token = bearerOf(req)
+  return { token, email: (await verifyToken(env, token)).email }
 }
 
 async function readBigJson(req: Request): Promise<Record<string, unknown>> {
@@ -125,6 +107,43 @@ export async function houseRegister(env: Env, req: Request): Promise<unknown> {
     if (!list.includes(body.fileId)) await env.SUBS.put(k, JSON.stringify([body.fileId, ...list].slice(0, MAX_FAMILIES_PER_USER)))
   }
   return { ok: true, members: perms.length }
+}
+
+/** Tetto di account con cui una famiglia può essere condivisa (proprietario compreso). */
+export const MAX_MEMBERS = 20
+
+/**
+ * POST /house/join {fileId}: il CODICE è l'ID del file. Chi lo presenta (con un token valido per questa app) viene aggiunto dal Worker,
+ * con l'accesso di chi ha creato la famiglia, tra gli scrittori del file, senza email di notifica.
+ *
+ * Compromesso di sicurezza: chi conosce il codice può entrare, e il codice non si può cambiare. Per togliere qualcuno si toglie il
+ * suo account dalla condivisione su Drive, ma con il codice potrebbe rientrare: se il codice è trapelato, va creata una nuova famiglia.
+ * Chi ha già un permesso sul file (anche di sola lettura) non viene toccato: l'unione non promuove nessuno e ripeterla non duplica nulla.
+ */
+export async function houseJoin(env: Env, req: Request): Promise<unknown> {
+  if (!bridgeEnabled(env)) throw new HttpError(503, 'Il ponte non è configurato sul server')
+  const body = await readJson(req)
+  if (!validFileId(body.fileId)) throw new HttpError(400, 'File non valido')
+  const { email } = await whoami(env, req) // l'email viene solo dal token verificato, mai dal corpo della richiesta
+  const house = await loadHouse(env, body.fileId)
+  if (!house) throw new HttpError(404, 'Codice sconosciuto, oppure chi ha creato la famiglia deve riaprire l’app con l’accesso persistente.')
+  const token = await houseToken(env, body.fileId, house)
+  const perms = await permissionsOf(env, token, body.fileId)
+  let joined = false
+  if (!perms.some((p) => p.emailAddress?.toLowerCase() === email)) {
+    if (perms.filter((p) => p.emailAddress).length >= MAX_MEMBERS) throw new HttpError(403, `La famiglia è al completo (massimo ${MAX_MEMBERS} account).`)
+    const r = await fetch(`${google(env)}/drive/v3/files/${encodeURIComponent(body.fileId)}/permissions?sendNotificationEmail=false&supportsAllDrives=true`, {
+      method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type: 'user', role: 'writer', emailAddress: email }),
+    })
+    if (!r.ok) throw new HttpError(502, 'Impossibile aggiungerti alla famiglia')
+    joined = true
+  }
+  const k = ikey(email)
+  let list: string[] = []
+  try { list = JSON.parse((await env.SUBS.get(k)) ?? '[]') as string[] } catch { list = [] }
+  if (!list.includes(body.fileId)) await env.SUBS.put(k, JSON.stringify([body.fileId, ...list].slice(0, MAX_FAMILIES_PER_USER)))
+  return { ok: true, joined }
 }
 
 /** POST /house/mine: le famiglie a cui l'account è stato invitato (file condivisi con lui e collegati al ponte). */

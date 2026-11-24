@@ -53,6 +53,23 @@ export async function bridgeWrite(token: string, fileId: string, db: AppDatabase
   return (await call('/db/write', token, { fileId, db, expectedVersion })).meta as DriveFile
 }
 
+export interface JoinResult { ok: boolean; joined: boolean; error?: string }
+
+/**
+ * Entra in una famiglia con il suo CODICE (l'ID del file): il Worker, con l'accesso di chi l'ha creata, condivide il file con questo
+ * account. Si chiama solo quando l'utente presenta il codice (campo «ID famiglia» o link d'invito), mai in automatico.
+ * Un Worker più vecchio non ha questa rotta (404 «Non trovato»): non è un errore, la catena prosegue con Selettore.
+ */
+export async function bridgeJoin(token: string, fileId: string): Promise<JoinResult> {
+  if (!(await bridgeAvailable())) return { ok: false, joined: false }
+  let r: BridgeResult
+  try { r = await post('/house/join', token, { fileId }) } catch { return { ok: false, joined: false } }
+  if (r.status === 401) throw new DriveError(401, r.json?.error || t('Sessione Google scaduta'))
+  if (r.status === 200) return { ok: true, joined: r.json?.joined === true }
+  const generic = typeof r.json?.error !== 'string' || r.json.error === 'Non trovato'
+  return { ok: false, joined: false, error: generic ? undefined : r.json.error }
+}
+
 /** Chi ha accesso diretto al file lo affida al ponte (con la sua sessione persistente). Silenzioso se non applicabile. */
 export async function registerFamily(fileId: string, token: string): Promise<boolean> {
   const session = sessionId()

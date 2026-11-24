@@ -6,7 +6,7 @@ import { addExtra, toggleCheck } from '../services/dbOps'
 /** Famiglia «remota» con versione incrementale. Accesso diretto e ponte sono interruttori. */
 const { R, DriveError, S } = vi.hoisted(() => {
   class DriveError extends Error { status: number; constructor(s: number, m: string) { super(m); this.status = s } }
-  const R = { db: null as unknown, version: 1, direct: false, bridge: true, bridgeAvail: true, writes: 0, bridgeWrites: 0, bridgeReads: 0, metaCalls: 0, picker: true, picked: null as string | null, shared: [] as unknown[], registered: 0, conflictOnce: false }
+  const R = { db: null as unknown, version: 1, direct: false, bridge: true, bridgeAvail: true, writes: 0, bridgeWrites: 0, bridgeReads: 0, metaCalls: 0, picker: true, picked: null as string | null, shared: [] as unknown[], registered: 0, conflictOnce: false, joinMode: 'ok' as 'ok' | 'old' | 'full' | 'expired', joinCalls: 0 }
   return { R, DriveError, S: { session: true } }
 })
 const file = (extra: object = {}) => ({ id: 'FAMILYID12345', name: 'meal-duo-db.json', version: String(R.version), modifiedTime: 'now', ...extra })
@@ -40,6 +40,14 @@ vi.mock('./bridge', () => {
       R.bridgeWrites++; R.db = structuredClone(db); R.version++; return file()
     }),
     registerFamily: vi.fn(async () => { R.registered++; return true }),
+    // /house/join: «ok» condivide con chi lo presenta (da quel momento il ponte lo lascia entrare); «old» = Worker senza la rotta
+    bridgeJoin: vi.fn(async () => {
+      R.joinCalls++
+      if (R.joinMode === 'expired') throw new DriveError(401, 'Sessione Google scaduta')
+      if (R.joinMode === 'old') return { ok: false, joined: false }
+      if (R.joinMode === 'full') return { ok: false, joined: false, error: 'La famiglia è al completo (massimo 20 account).' }
+      R.bridge = true; return { ok: true, joined: true }
+    }),
     myFamilies: vi.fn(async () => (R.bridge ? [{ id: 'FAMILYID12345', name: 'meal-duo-db.json', modifiedTime: 'now' }] : [])),
   }
 })
@@ -67,7 +75,7 @@ beforeEach(() => {
   vi.stubGlobal('window', { addEventListener: () => undefined })
   vi.stubGlobal('document', { addEventListener: () => undefined, visibilityState: 'visible' })
   vi.stubGlobal('setInterval', () => 0)
-  Object.assign(R, { db: fixtureDb() as unknown, version: 1, direct: false, bridge: true, bridgeAvail: true, writes: 0, bridgeWrites: 0, bridgeReads: 0, metaCalls: 0, picker: true, picked: null, shared: [], registered: 0, conflictOnce: false })
+  Object.assign(R, { db: fixtureDb() as unknown, version: 1, direct: false, bridge: true, bridgeAvail: true, writes: 0, bridgeWrites: 0, bridgeReads: 0, metaCalls: 0, picker: true, picked: null, shared: [], registered: 0, conflictOnce: false, joinMode: 'ok', joinCalls: 0 })
 })
 const mk = (local: AppDatabase = structuredClone(R.db as AppDatabase)) => {
   const e = new SyncEngine()
@@ -107,6 +115,36 @@ describe('apertura di una famiglia: diretto → ponte → Picker ristretto', () 
     R.bridge = false; R.picker = false
     const { e } = mk()
     await expect(e.resolveFamily('FAMILYID12345')).rejects.toThrow(/Nessun accesso al database della famiglia/)
+  })
+  it('con il codice (viaCode) chi non è stato invitato entra: il ponte lo condivide e poi legge; senza codice nessun join', async () => {
+    R.bridge = false // mai invitato
+    const { e } = mk()
+    await expect(e.resolveFamily('FAMILYID12345')).rejects.toBeInstanceOf(NeedsPickerError) // tentativo automatico: nessun join, e il Picker serve un tocco
+    expect(R.joinCalls).toBe(0)
+    const r = await e.resolveFamily('FAMILYID12345', false, true)
+    expect(r.bridged).toBe(true); expect(R.joinCalls).toBe(1)
+  })
+  it('già invitato: il codice non fa join (il ponte lo legge subito)', async () => {
+    const { e } = mk()
+    expect((await e.resolveFamily('FAMILYID12345', false, true)).bridged).toBe(true)
+    expect(R.joinCalls).toBe(0)
+  })
+  it('il codice non apre il Picker da solo (serve un tocco) e con un Worker vecchio (nessun /house/join) si arriva al Picker', async () => {
+    R.bridge = false; R.joinMode = 'old'
+    const { e } = mk()
+    await expect(e.resolveFamily('FAMILYID12345', false, true)).rejects.toBeInstanceOf(NeedsPickerError)
+    R.picked = 'FAMILYID12345'; R.direct = true
+    expect((await e.resolveFamily('FAMILYID12345', true, true)).bridged).toBe(false)
+  })
+  it('famiglia al completo o Worker senza codice: il messaggio del server arriva all\'utente (senza Picker)', async () => {
+    R.bridge = false; R.picker = false; R.joinMode = 'full'
+    const { e } = mk()
+    await expect(e.resolveFamily('FAMILYID12345', false, true)).rejects.toThrow(/al completo/)
+  })
+  it('sessione scaduta durante il join: 401 (serve un nuovo accesso, non un errore generico)', async () => {
+    R.bridge = false; R.joinMode = 'expired'
+    const { e } = mk()
+    await expect(e.resolveFamily('FAMILYID12345', false, true)).rejects.toMatchObject({ status: 401 })
   })
   it('listFamilies unisce file diretti e famiglie del ponte senza duplicati', async () => {
     const { e } = mk()

@@ -122,7 +122,6 @@ export const EN: Record<string, string> = {
   "I nomi vengono associati al catalogo alimenti della famiglia (es. \"pollo\" → \"Petto di pollo\"), così la spesa somma le quantità correttamente.": "Names are matched to the family food catalogue (e.g. \"pollo\" → \"Petto di pollo\"), so the shopping list adds quantities up correctly.",
   "ID famiglia": "Family ID",
   "ID famiglia non valido.": "Invalid family ID.",
-  "Il codice da dare a chi entra: dopo l’invito lo incolla all’accesso come «ID famiglia».": "The code to give to whoever joins: after the invitation they paste it at sign-in as “Family ID”.",
   "Il database sarà un file nel tuo Drive: tu sei il proprietario e inviti gli altri dalle Impostazioni.": "The database will be a file in your Drive: you are the owner and invite the others from Settings.",
   "Il database viene modificato di continuo da un altro dispositivo: riprovo tra poco.": "The database keeps being changed by another device: I'll try again shortly.",
   "Il mio Drive": "My Drive",
@@ -441,4 +440,6 @@ export const EN: Record<string, string> = {
   "Sono diversi: tieni entrambi": "They're different: keep both",
   "Alimenti tenuti separati": "Foods kept separate",
   "Hai mangiato tutto quello che avevi in programma.": "You ate everything you had planned.",
+  "Il codice basta: chi lo riceve (o apre il link d’invito) entra da solo, senza che tu inserisca la sua email. È un segreto condiviso: chi lo conosce può entrare, e togliere una persona da Drive non basta se ha ancora il codice.": "The code is enough: whoever gets it (or opens the invite link) joins on their own, without you entering their email. It's a shared secret: anyone who knows it can join, and removing someone from Drive isn't enough if they still have the code.",
+  "Il codice da solo non basta finché la famiglia non è collegata al server (servono l’accesso persistente e il Worker aggiornato): per ora invita le persone con la loro email, poi daranno il codice o apriranno il link.": "The code alone isn't enough until the family is linked to the server (you need persistent access and the updated Worker): for now invite people by email, then they'll enter the code or open the link.",
 }

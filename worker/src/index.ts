@@ -1,4 +1,5 @@
-import { bridgeAccess, bridgeEnabled, dbMeta, dbRead, dbWrite, houseMine, houseRegister } from './bridge'
+import { bridgeAccess, bridgeEnabled, dbMeta, dbRead, dbWrite, houseJoin, houseMine, houseRegister } from './bridge'
+import { bearerOf, verifyToken } from './identity'
 import { authCallback, authConfigured, authLogout, authRefresh, authStart } from './auth'
 import { sendWebPush, type PushSubscriptionData, type VapidKeys } from './webpush'
 
@@ -74,22 +75,17 @@ function cors(env: Env, req: Request): Record<string, string> {
  */
 export async function authenticate(env: Env, req: Request, fileId: string, directOnly = false): Promise<string> {
   const google = env.GOOGLE_API || 'https://www.googleapis.com'
-  const token = /^Bearer (.+)$/.exec(req.headers.get('Authorization') ?? '')?.[1]
-  if (!token) throw new HttpError(401, 'Accesso mancante')
+  const token = bearerOf(req)
   const auth = { Authorization: `Bearer ${token}` }
-  const about = await fetch(`${google}/drive/v3/about?fields=user(emailAddress)`, { headers: auth })
-  if (about.status === 401) throw new HttpError(401, 'Sessione Google non valida o scaduta')
-  if (!about.ok) throw new HttpError(502, 'Google non risponde')
-  const email = ((await about.json()) as { user?: { emailAddress?: string } }).user?.emailAddress
-  if (!email) throw new HttpError(401, 'Account Google non riconosciuto')
+  const { email } = await verifyToken(env, token) // emesso per questa app, solo drive.file; email verificata da Google
   const file = await fetch(`${google}/drive/v3/files/${encodeURIComponent(fileId)}?fields=id&supportsAllDrives=true`, { headers: auth })
   if (file.status === 404 || file.status === 403) {
     // niente accesso diretto (permesso `drive.file`): passa chi ha il file condiviso e la famiglia collegata al ponte
-    if (!directOnly && (await bridgeAccess(env, token, email, fileId))) return email.toLowerCase()
+    if (!directOnly && (await bridgeAccess(env, email, fileId))) return email
     throw new HttpError(403, 'Nessun accesso al database della famiglia')
   }
   if (!file.ok) throw new HttpError(502, 'Google non risponde')
-  return email.toLowerCase()
+  return email
 }
 
 export async function readJson(req: Request): Promise<Record<string, unknown>> {
@@ -171,7 +167,7 @@ export default {
     const json = (status: number, data: unknown) => new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json', ...headers } })
     const { pathname } = new URL(req.url)
     if (req.method === 'OPTIONS') return new Response(null, { status: headers['Access-Control-Allow-Origin'] ? 204 : 403, headers })
-    if (pathname === '/health') return json(200, { ok: true, auth: authConfigured(env), bridge: bridgeEnabled(env) })
+    if (pathname === '/health') return json(200, { ok: true, auth: authConfigured(env), push: !!(env.VAPID_PUBLIC_KEY && env.VAPID_PRIVATE_KEY), bridge: bridgeEnabled(env) })
     // l'accesso persistente passa da due pagine aperte nel browser (GET): Google rimanda qui dopo il consenso
     if (req.method === 'GET' && pathname === '/auth/start') return authStart(env, req)
     if (req.method === 'GET' && pathname === '/auth/callback') return authCallback(env, req)
@@ -183,6 +179,7 @@ export default {
       if (pathname === '/unsubscribe') return json(200, await unsubscribe(env, req))
       if (pathname === '/notify') return json(200, await notify(env, req))
       if (pathname === '/house/register') return json(200, await houseRegister(env, req))
+      if (pathname === '/house/join') return json(200, await houseJoin(env, req))
       if (pathname === '/house/mine') return json(200, await houseMine(env, req))
       if (pathname === '/db/meta') return json(200, await dbMeta(env, req))
       if (pathname === '/db/read') return json(200, await dbRead(env, req))

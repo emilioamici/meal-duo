@@ -10,7 +10,7 @@ import { DB_FILE_NAME, DriveError } from './drive'
 import { GoogleAuthError, cachedToken, clearToken, requestToken, revokeToken, setToken, tokenRemainingMs, type Prompt } from './google'
 import { SessionExpired, brokerAvailable, hasSession, logoutBroker, refreshAccessToken, startBrokerLogin } from './auth'
 import { pickDatabase, pickFolder, pickerConfigured, type Picked } from './picker'
-import { ConflictError, bridgeAvailable, bridgeMeta, bridgeRead, bridgeWrite, myFamilies, registerFamily } from './bridge'
+import { ConflictError, bridgeAvailable, bridgeJoin, bridgeMeta, bridgeRead, bridgeWrite, myFamilies, registerFamily } from './bridge'
 import { inviteLink } from './invite'
 
 /**
@@ -46,6 +46,8 @@ interface Persisted {
   dirty: boolean
   /** la famiglia si apre dal ponte del Worker (invitato senza accesso diretto al file) */
   bridged: boolean
+  /** quando chi ha creato la famiglia l'ha affidata al ponte del Worker (null = non ancora: il codice da solo non basta) */
+  bridgeRegAt: number | null
 }
 
 export type SyncStatus = 'off' | 'auth' | 'pending' | 'syncing' | 'synced' | 'offline' | 'error'
@@ -69,7 +71,7 @@ export interface SyncHost {
   afterSync?: () => void
 }
 
-const EMPTY: Persisted = { fileId: null, fileName: null, email: null, name: null, ownerEmail: null, canShare: false, remoteVersion: null, lastSyncAt: null, dirty: false, bridged: false }
+const EMPTY: Persisted = { fileId: null, fileName: null, email: null, name: null, ownerEmail: null, canShare: false, remoteVersion: null, lastSyncAt: null, dirty: false, bridged: false, bridgeRegAt: null }
 
 function loadPersisted(): Persisted {
   try {
@@ -303,7 +305,7 @@ export class SyncEngine {
     const f = await drive.createFile(token, JSON.stringify(db), DB_FILE_NAME, opts.folderId)
     this.host!.applyDb((prev) => (keep ? { ...mergeDatabases(prev, db) } : db), false)
     this.reconciled = true
-    this.p = { ...this.p, fileId: f.id, fileName: f.name, ownerEmail: this.p.email, canShare: true, bridged: false, remoteVersion: f.version, lastSyncAt: nowIso(), dirty: false }
+    this.p = { ...this.p, fileId: f.id, fileName: f.name, ownerEmail: this.p.email, canShare: true, bridged: false, bridgeRegAt: null, remoteVersion: f.version, lastSyncAt: nowIso(), dirty: false }
     this.persist()
     this.set('synced')
     void this.registerBridge(true)
@@ -319,11 +321,12 @@ export class SyncEngine {
   }
 
   /**
-   * Apre una famiglia dal suo ID (o dal link d'invito), come in Clean Duo: accesso diretto al file → ponte del Worker (nessun
-   * Selettore, nessun ID da inserire) → Selettore di Google ristretto a quel file (un tocco, `picker: true`: serve un gesto).
-   * `NeedsPickerError` = serve il tocco sul Picker.
+   * Apre una famiglia dal suo ID (o dal link d'invito), come in Clean Duo: 1) accesso diretto al file → 2) ponte del Worker (già
+   * invitato: si legge; altrimenti, SE l'utente ha presentato il codice (`viaCode`), prima `/house/join` che lo condivide con lui) →
+   * 3) Selettore di Google ristretto a quel file (un tocco, `picker: true`: serve un gesto) → 4) errore con la causa.
+   * `NeedsPickerError` = serve il tocco sul Picker. I tentativi automatici (senza codice) non fanno mai join né Selettore.
    */
-  async resolveFamily(input: string, picker = false): Promise<ResolvedFamily> {
+  async resolveFamily(input: string, picker = false, viaCode = false): Promise<ResolvedFamily> {
     const id = drive.parseFileId(input)
     if (!id) throw new Error(t('ID famiglia non valido.'))
     const noAccess = (e: unknown): e is DriveError => e instanceof DriveError && (e.status === 404 || e.status === 403)
@@ -331,6 +334,11 @@ export class SyncEngine {
     let bridgeMsg = ''
     if (await bridgeAvailable()) {
       try { return { ...(await this.inspect(id, true)), bridged: true } } catch (e) { if (!noAccess(e)) throw e; bridgeMsg = e.message }
+      if (viaCode) {
+        const j = await bridgeJoin(await this.token(), id)
+        if (j.ok) { try { return { ...(await this.inspect(id, true)), bridged: true } } catch (e) { if (!noAccess(e)) throw e; bridgeMsg = e.message } }
+        else if (j.error) bridgeMsg = j.error
+      }
     }
     if (!pickerConfigured()) throw new Error(bridgeMsg || t('Non riesco ad aprire la famiglia: controlla l\'ID e che ti abbia invitato con questo account Google.'))
     if (!picker) throw new NeedsPickerError()
@@ -344,7 +352,7 @@ export class SyncEngine {
   async link(file: drive.DriveFile, remote: Db, mode: 'merge' | 'replace', bridged = false): Promise<void> {
     this.host!.applyDb((prev) => (mode === 'merge' ? mergeDatabases(prev, remote) : remote), false)
     this.reconciled = true
-    this.p = { ...this.p, fileId: file.id, fileName: file.name, ownerEmail: file.owners?.[0]?.emailAddress ?? null, canShare: !bridged && !!(file.ownedByMe || file.capabilities?.canShare), bridged, remoteVersion: file.version, lastSyncAt: nowIso(), dirty: mode === 'merge' }
+    this.p = { ...this.p, fileId: file.id, fileName: file.name, ownerEmail: file.owners?.[0]?.emailAddress ?? null, canShare: !bridged && !!(file.ownedByMe || file.capabilities?.canShare), bridged, bridgeRegAt: null, remoteVersion: file.version, lastSyncAt: nowIso(), dirty: mode === 'merge' }
     this.persist()
     this.set(mode === 'merge' ? 'pending' : 'synced')
     if (mode === 'merge') void this.syncNow()
@@ -352,7 +360,7 @@ export class SyncEngine {
   }
 
   unlink(): void {
-    this.p = { ...this.p, fileId: null, fileName: null, remoteVersion: null, dirty: false, lastSyncAt: null, bridged: false }
+    this.p = { ...this.p, fileId: null, fileName: null, remoteVersion: null, dirty: false, lastSyncAt: null, bridged: false, bridgeRegAt: null }
     this.persist()
     this.set('off')
   }
@@ -375,7 +383,11 @@ export class SyncEngine {
     const tk = cachedToken()
     if (!tk) return false
     const ok = await registerFamily(id, tk)
-    if (ok) { try { localStorage.setItem(regKey(id), String(Date.now())) } catch { /* noop */ } }
+    if (ok) {
+      const now = Date.now()
+      try { localStorage.setItem(regKey(id), String(now)) } catch { /* noop */ }
+      if (this.p.fileId === id) { this.p = { ...this.p, bridgeRegAt: now }; this.persist() } // la UI può dire che «il codice basta»
+    }
     return ok
   }
 

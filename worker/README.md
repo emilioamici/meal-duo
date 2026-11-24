@@ -105,8 +105,48 @@ Non serve altro (l'app usa lo stesso indirizzo del server delle notifiche). Sull
 - **Dopo 7 giorni chiede di nuovo l'accesso:** l'app è ancora in *Testing*; vedi il punto 1.1.
 - **«Origine non autorizzata»:** `ALLOWED_ORIGINS` deve contenere l'origine dell'app (per esempio `https://emilioamici.github.io`, senza percorso).
 
-## Ponte per gli invitati (Clean Duo)
-Con lo scope `drive.file` gli invitati non vedono il file della famiglia. Il Worker espone `/house/register`, `/house/mine`, `/db/meta`, `/db/read`, `/db/write`: il proprietario registra la famiglia, gli invitati leggono/scrivono passando dal Worker, che ricontrolla a ogni richiesta i permessi su Drive (scrittura solo owner/writer). Richiede `KV`, `SESSION_KEY` e il client secret già usati per l'accesso persistente. Sono accettati solo i token emessi per il tuo Client ID (`GOOGLE_CLIENT_ID`, già configurato): non serve altro. `ALLOWED_CLIENT_IDS` (facoltativa, elenco separato da virgole) serve solo per ammettere altri Client ID. `GET /health` risponde `{ok, auth, bridge}`.
+## Il ponte: condivisione del database tra account Google
+
+Con il permesso minimo `drive.file` un'app vede solo i file che ha creato o che l'utente ha aperto con il Selettore di Google: un file creato da A **non** è accessibile da B, nemmeno se condiviso su Drive. Il Worker fa da ponte: legge e scrive il file con l'accesso di chi ha creato la famiglia, ma solo per gli account autorizzati. Il database è un file JSON nel Drive del proprietario; il Worker non lo conserva né lo registra.
+
+**Endpoint** (tutti `POST`, solo da `ALLOWED_ORIGINS`, con `Authorization: Bearer <token Google>`):
+
+| Rotta | Chi | Cosa fa |
+|---|---|---|
+| `/house/register {fileId, session}` | solo il proprietario del file | affida al Worker il collegamento (token di rinnovo **cifrato** in KV `house:<fileId>`); verifica che la sessione sia dello stesso account; indicizza in `inv:<email>` gli account già presenti tra le condivisioni |
+| `/house/join {fileId}` | chiunque presenti il codice | il **codice è l'ID del file**: il Worker, con l'accesso del proprietario, aggiunge l'account tra gli scrittori (`sendNotificationEmail=false`). Max 20 account. Chi ha già un permesso (anche di sola lettura) non viene toccato; ripetere non duplica |
+| `/house/mine` | un invitato | i file condivisi con l'account e collegati al ponte (inviti ricevuti senza codice) |
+| `/db/meta`, `/db/read`, `/db/write {fileId, db, expectedVersion}` | chi è tra le condivisioni (per scrivere: ruolo writer/owner) | legge/scrive con l'accesso del proprietario. La scrittura avviene solo se la versione di Drive coincide con `expectedVersion` (altrimenti `409`, l'app rilegge e rifà il merge); la forma del database è validata (`400`); corpo massimo ~6 MB |
+| `/subscribe`, `/unsubscribe`, `/notify` | idem | notifiche push: accettano anche chi passa dal ponte |
+
+**Modello di sicurezza**
+- L'unica fonte di autorizzazione è la **condivisione del file su Drive**: nel Worker non c'è un elenco di membri. Invitare = `permissions.create` (writer), togliere = `permissions.delete`. A ogni chiamata il Worker rilegge i permessi con l'accesso del proprietario (non si mettono in cache): togliere un account chiude subito il ponte per lui.
+- Il client non è creduto sulla parola: ogni richiesta porta un token Google che il Worker verifica con `tokeninfo` (emesso per **il tuo** Client ID, e con il solo permesso `drive.file`) e da cui ricava l'email con `drive/v3/about`. Un token emesso per un'altra app o con un permesso più ampio riceve `401`. Il token non si salva mai; in memoria restano per al più 60 secondi solo l'impronta del token e l'email.
+- Se Google revoca l'accesso del proprietario (`invalid_grant`) il collegamento `house:<fileId>` si cancella e le chiamate rispondono `410`: chi ha creato la famiglia deve riaprire l'app.
+- Il refresh token del proprietario e quelli di sessione sono cifrati con AES-GCM (`SESSION_KEY`); i segreti si impostano solo con `npx wrangler secret put`.
+
+**⚠ Il codice è un segreto condiviso.** Chi conosce l'ID famiglia può entrare con `/house/join`, e l'ID non si può cambiare. Per togliere una persona la si rimuove dalla condivisione su Drive (l'accesso si chiude subito), ma se ha ancora il codice può rientrare. Se il codice trapela, crea una nuova famiglia. Se vuoi che entrino solo persone invitate per email, non distribuire il codice: l'invito con email e il link `#join` funzionano comunque, ma il link contiene lo stesso codice.
+
+**Senza Worker** l'app funziona lo stesso: si invita per email e chi entra conferma il file con il Selettore di Google (ristretto a quel file). Ogni funzione del server si attiva solo se `GET /health` la dichiara: `{ ok, auth, push, bridge }` (`auth`: accesso persistente configurato; `push`: chiavi VAPID presenti; `bridge`: ponte attivo, richiede l'accesso persistente). Un Worker più vecchio non ha `/house/join`: l'app prosegue con il Selettore.
+
+**Pubblicare** (dopo ogni modifica al Worker, a mano; GitHub Pages si aggiorna da solo, il Worker no):
+```bash
+cd worker
+npx wrangler deploy
+```
+
+**Checklist Google Cloud**
+1. *Google Auth Platform → Branding/Pubblico*: pubblica l'app in **Produzione** (con il solo `drive.file` non serve la verifica). In *Testing* il token di rinnovo scade dopo 7 giorni e l'accesso persistente non è davvero persistente.
+2. *Credenziali → ID client OAuth (Applicazione web)*: **Origini JavaScript autorizzate** = `https://<utente>.github.io` (schema + dominio, senza percorso); **URI di reindirizzamento** = `https://<tuo-worker>.workers.dev/auth/callback`.
+3. Client ID e segreto del Worker (`GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`) dello **stesso progetto**; `GOOGLE_CLIENT_ID` coincide con `VITE_GOOGLE_CLIENT_ID` dell'app. Il Worker chiede sempre e solo il permesso `drive.file`: chi aveva una sessione creata con un permesso più ampio riceve `401` e deve rifare l'accesso una volta.
+4. API abilitate: **Google Drive API** e **Google Picker API** (il Selettore serve solo come ripiego).
+
+**«The API developer key is invalid» (Selettore)**
+- La chiave API è una **Variable** di GitHub (*Settings → Secrets and variables → Actions → Variables*, `VITE_GOOGLE_API_KEY`), **non** un Secret: i Secret non arrivano alla build dell'app.
+- Chiave API e Client ID devono essere dello **stesso progetto** Google Cloud; `VITE_GOOGLE_APP_ID` è il *numero del progetto*.
+- Abilita *Google Picker API* e *Google Drive API*; limita la chiave solo a *Google Picker API*.
+- *Restrizioni delle applicazioni → Siti web*: `https://<utente>.github.io/*` (**origine senza percorso**: il Selettore gira in un iframe di Google e il browser invia solo l'origine; con `…/meal-duo/*` si ottiene proprio questo errore).
+- Con il ponte attivo e il codice, il Selettore non serve: un errore sulla chiave non impedisce di entrare.
 
 ## Se qualcosa non va
 - **«Origine non autorizzata» (403):** `ALLOWED_ORIGINS` non coincide con l'indirizzo del sito. Correggi `wrangler.toml` e rifai `npx wrangler deploy`.
