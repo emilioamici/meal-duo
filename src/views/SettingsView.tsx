@@ -40,12 +40,14 @@ export function SettingsView() {
   return (
     <>
       <PageHeader title={t('Impostazioni')} subtitle={t('Famiglia, sincronizzazione e dati')} right={<HeaderActions />} />
-      <div className="space-y-3">
+      <div className="space-y-3 lg:grid lg:grid-cols-2 lg:items-start lg:gap-3 lg:space-y-0">
+        <div className="lg:col-span-2">
         <MascotPeek kind="pair">
           <Accordion id="look" title={t('Aspetto')} icon={<Palette size={20} />} summary={`${themeLabel} · ${lp === 'auto' ? t('Automatico') : LANG_NAME[lp]}`}>
             <AppearanceCard onChange={() => refresh((n) => n + 1)} />
           </Accordion>
         </MascotPeek>
+        </div>
 
         <Accordion id="family" title={t('Famiglia')} icon={<Users size={20} />} summary={`${db.houseName} · ${tp(members.length, '{n} membro', '{n} membri', { n: members.length })}`}>
           <FamilyCard />
@@ -72,7 +74,7 @@ export function SettingsView() {
           <DataSection />
         </Accordion>
 
-        <p className="flex gap-2 px-1 pb-4 text-xs text-muted"><ShieldCheck size={16} className="shrink-0" /><span>{t('I dati restano nel tuo Google Drive e su questo dispositivo. Il server della famiglia (il tuo Cloudflare Worker) li fa solo transitare per gli invitati e non li conserva.')} · Meal Duo · <a className="font-semibold text-brand" href={import.meta.env.BASE_URL + 'privacy.html'}>{t('Informativa sulla privacy')}</a></span></p>
+        <p className="flex gap-2 px-1 pb-4 text-xs text-muted lg:col-span-2"><ShieldCheck size={16} className="shrink-0" /><span>{t('I dati restano nel tuo Google Drive e su questo dispositivo. Il server della famiglia (il tuo Cloudflare Worker) li fa solo transitare per gli invitati e non li conserva.')} · Meal Duo · <a className="font-semibold text-brand" href={import.meta.env.BASE_URL + 'privacy.html'}>{t('Informativa sulla privacy')}</a></span></p>
       </div>
     </>
   )

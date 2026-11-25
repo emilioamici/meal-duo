@@ -6,6 +6,7 @@ import { useStore } from '../state/store'
 import { engine, type SyncStatus } from '../sync/engine'
 import { useUi, type Tab } from '../state/ui'
 import { useOverlay } from '../state/overlay'
+import { MascotImg } from './Mascots'
 import { t } from '../i18n'
 
 /* ---------- Sfondo vivo: 3 blob sfocati animati con sole transform (§1.4) ---------- */
@@ -28,10 +29,11 @@ const TABS: { id: Tab; label: string; icon: ComponentType<{ size?: number; strok
   { id: 'settings', label: 'Impostazioni', icon: Settings },
 ]
 
+/** Barra in basso (telefono): su tablet e PC la sostituisce la barra laterale. */
 export function BottomNav({ shopBadge }: { shopBadge: number }) {
   const { tab, setTab } = useUi()
   return (
-    <nav className="glass absolute inset-x-4 bottom-4 z-40 flex items-center justify-between !rounded-full p-1.5"
+    <nav className="glass absolute inset-x-4 bottom-4 z-40 flex items-center justify-between !rounded-full p-1.5 md:hidden"
       style={{ marginBottom: 'env(safe-area-inset-bottom)' }} aria-label={t('Navigazione principale')}>
       {TABS.map(({ id, label, icon: Icon }) => {
         const active = tab === id
@@ -56,14 +58,45 @@ export function BottomNav({ shopBadge }: { shopBadge: number }) {
   )
 }
 
+/* ---------- Barra laterale (tablet e PC, da 768 px): icone con etichetta, poi a 1024 px più larga con il titolo ---------- */
+export function SideNav({ shopBadge }: { shopBadge: number }) {
+  const { tab, setTab } = useUi()
+  return (
+    <aside className="hidden shrink-0 flex-col border-r border-line/70 bg-surface/50 backdrop-blur-xl md:flex md:w-24 lg:w-64">
+      <div className="flex items-center justify-center gap-3 px-3 pb-3 pt-6 lg:justify-start lg:px-6">
+        <MascotImg kind="mochi" className="h-10 w-auto shrink-0" />
+        <span className="hidden text-xl font-extrabold tracking-tight lg:block">Meal <span className="text-brand">Duo</span></span>
+      </div>
+      <nav className="flex flex-1 flex-col gap-1.5 p-3 lg:px-4" aria-label={t('Navigazione principale')}>
+        {TABS.map(({ id, label, icon: Icon }) => {
+          const active = tab === id
+          return (
+            <button key={id} onClick={() => setTab(id)} aria-current={active ? 'page' : undefined} aria-label={t(label)} title={t(label)}
+              className="relative flex flex-col items-center gap-1 rounded-2xl px-2 py-3 text-center transition hover:bg-line/40 active:scale-95 lg:flex-row lg:gap-3 lg:px-4 lg:text-left">
+              {active && <motion.span layoutId="side-nav-active" className="glass-active absolute inset-0 rounded-2xl" transition={{ type: 'spring', stiffness: 420, damping: 32 }} />}
+              <span className={`relative ${active ? 'text-brand' : 'text-muted'}`}>
+                <Icon size={22} strokeWidth={active ? 2.6 : 2.1} />
+                {id === 'shop' && shopBadge > 0 && (
+                  <span className="absolute -right-2.5 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-exp px-1 text-[10px] font-bold text-onbrand">{shopBadge}</span>
+                )}
+              </span>
+              <span className={`relative text-[11px] font-semibold lg:text-sm ${active ? 'text-brand' : 'text-muted'}`}>{t(label)}</span>
+            </button>
+          )
+        })}
+      </nav>
+      <p className="hidden px-6 pb-5 text-xs text-muted lg:block">{t('Suggerimento: i tasti 1–4 cambiano schermata.')}</p>
+    </aside>
+  )
+}
+
 /* ---------- FAB (portal su #shell-overlay, §2.5) ---------- */
 export function Fab({ onClick, label, icon }: { onClick: () => void; label: string; icon?: React.ReactNode }) {
   const host = useOverlay().overlay
   if (!host) return null
   return createPortal(
     <motion.button whileTap={{ scale: 0.9 }} onClick={onClick} aria-label={label}
-      className="glass-btn btn-primary pointer-events-auto absolute right-5 !h-14 !w-14 !p-0"
-      style={{ bottom: 'calc(5.75rem + env(safe-area-inset-bottom))' }}>
+      className="glass-btn btn-primary pointer-events-auto absolute right-5 bottom-[calc(5.75rem+env(safe-area-inset-bottom))] !h-14 !w-14 !p-0 md:bottom-8 md:right-8">
       {icon ?? <Plus size={26} strokeWidth={2.6} />}
     </motion.button>,
     host,
@@ -121,7 +154,7 @@ export function Toast() {
     <AnimatePresence>
       {toast && (
         <motion.div key={toast} role="status"
-          className="glass-strong absolute inset-x-6 top-4 z-[70] px-4 py-3 text-center text-sm font-semibold"
+          className="glass-strong absolute inset-x-6 top-4 z-[70] px-4 py-3 text-center text-sm font-semibold md:inset-x-auto md:left-1/2 md:w-[28rem] md:max-w-[calc(100%-3rem)] md:-translate-x-1/2"
           style={{ marginTop: 'env(safe-area-inset-top)' }}
           initial={{ opacity: 0, y: -20, scale: 0.95 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: -12 }}>
           {toast}

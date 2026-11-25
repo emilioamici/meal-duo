@@ -85,7 +85,7 @@ export function TodayView() {
         </MascotPeek>
       </div>
 
-      <div className="mt-3 space-y-3">
+      <div className="mt-3 space-y-3 md:grid md:grid-cols-2 md:items-start md:gap-3 md:space-y-0 xl:grid-cols-3">
         <AnimatePresence initial={false}>
           {meals.map((meal, i) => (
             <motion.section key={meal.id} layout className="card p-3"
@@ -123,17 +123,17 @@ export function TodayView() {
         </AnimatePresence>
 
         {meals.length === 0 && (
-          <EmptyCard mascot={<MascotImg kind="zenitsu-pizza" className="mx-auto h-24 w-auto" />} title={t('Nessun pasto per questo giorno')} text={t('Aggiungi un pasto per iniziare a pianificare.')} />
+          <div className="md:col-span-2 xl:col-span-3"><EmptyCard mascot={<MascotImg kind="zenitsu-pizza" className="mx-auto h-24 w-auto" />} title={t('Nessun pasto per questo giorno')} text={t('Aggiungi un pasto per iniziare a pianificare.')} /></div>
         )}
 
         {meals.length > 0 && doneCount === meals.length && (
-          <div className="card flex items-center gap-3 p-3">
+          <div className="card flex items-center gap-3 p-3 md:col-span-2 xl:col-span-3">
             <MascotImg kind="mochi-rice" className="h-16 w-auto shrink-0" />
             <div><p className="font-bold">{t('Giornata completata!')}</p><p className="text-sm text-muted">{t('Hai mangiato tutto quello che avevi in programma.')}</p></div>
           </div>
         )}
 
-        <button className="glass-btn w-full" onClick={() => setMealSheet({})}><Plus size={16} />{t('Aggiungi pasto')}</button>
+        <button className="glass-btn w-full md:col-span-2 xl:col-span-3" onClick={() => setMealSheet({})}><Plus size={16} />{t('Aggiungi pasto')}</button>
       </div>
 
       <Fab label={t('Aggiungi alimento')} onClick={() => setItemSheet({ mealId: meals[0]?.id })} />

@@ -31,13 +31,13 @@ export function WeekView() {
 
       <div className="mt-2">
         <MascotPeek kind="zenitsu" side="left">
-          <div className="card divide-y divide-line/60 overflow-hidden">
+          <div className="card divide-y divide-line/60 overflow-hidden lg:grid lg:grid-cols-2 lg:divide-y-0">
             {DAY_INDEXES.map((d, i) => {
               const day = plan?.days[d]
               const tot = dayTotals(day)
               const meals = (day?.meals ?? []).filter((m) => m.items.length > 0).length
               return (
-                <motion.div key={d} className="flex items-center gap-1 pr-2" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.04 }}>
+                <motion.div key={d} className="flex items-center gap-1 pr-2 lg:border-b lg:border-line/60 lg:odd:border-r" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.04 }}>
                   <button className="flex min-w-0 flex-1 items-center gap-3 p-3 text-left active:bg-line/30" onClick={() => { setDay(d); setTab('today') }}>
                     <span className={`flex h-11 w-11 shrink-0 flex-col items-center justify-center rounded-2xl text-xs font-bold ${d === today ? 'bg-brand text-onbrand' : 'bg-line/60 text-ink'}`}>
                       {dayShort(d).toUpperCase()}
