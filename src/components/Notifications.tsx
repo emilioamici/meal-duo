@@ -72,7 +72,7 @@ export function NotificationToast() {
     <AnimatePresence>
       {toast && (
         <motion.div key={toast.id} role="status" aria-live="polite"
-          className="glass-strong absolute inset-x-4 top-4 z-[65] flex items-start gap-3 p-3" style={{ marginTop: 'env(safe-area-inset-top)' }}
+          className="glass-strong absolute inset-x-4 top-4 z-[65] flex items-start gap-3 p-3 md:inset-x-auto md:right-6 md:top-6 md:w-96" style={{ marginTop: 'env(safe-area-inset-top)' }}
           initial={{ opacity: 0, y: -20, scale: 0.95 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: -20, scale: 0.95 }}
           transition={{ type: 'spring', stiffness: 380, damping: 32 }}>
           <button className="flex min-w-0 flex-1 items-start gap-3 text-left" onClick={() => { dismissToast(); setCenterOpen(true) }}>

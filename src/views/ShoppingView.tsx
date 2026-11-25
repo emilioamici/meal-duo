@@ -133,7 +133,7 @@ export function ShoppingView() {
         {sections.map((s) => (
           <div key={s.category || 'all'}>
             {s.category && <h2 className="mb-2 mt-1 flex items-center gap-1.5 px-1 text-xs font-semibold uppercase tracking-wide text-muted"><CategoryIcon category={s.category as FoodCategory} size={14} className="text-brand" />{t(s.category)}</h2>}
-            <ul className="space-y-2">
+            <ul className="space-y-2 md:grid md:grid-cols-2 md:items-start md:gap-2 md:space-y-0">
               <AnimatePresence initial={false}>
                 {s.lines.map((l) => (
                   <motion.li key={l.key} layout initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, x: 90, scale: 0.92 }} transition={{ type: 'spring', stiffness: 400, damping: 34 }}>
@@ -169,7 +169,7 @@ export function ShoppingView() {
         {extras.length > 0 && (
           <div>
             <h2 className="mb-2 mt-1 px-1 text-xs font-semibold uppercase tracking-wide text-muted">{t('Extra')}</h2>
-            <ul className="space-y-2">
+            <ul className="space-y-2 md:grid md:grid-cols-2 md:items-start md:gap-2 md:space-y-0">
               <AnimatePresence initial={false}>
                 {extras.map((x) => {
                   const done = extraChecked(db, x)
@@ -233,7 +233,7 @@ function SwipeRow({ children, label, onDelete }: { children: React.ReactNode; la
   const reveal = useTransform(x, [-SWIPE_OPEN, -12, 0], [1, 0.2, 0])
   const settle = (to: number) => { setOpen(to !== 0); void controls.start({ x: to, transition: { type: 'spring', stiffness: 500, damping: 40 } }) }
   return (
-    <div className="relative">
+    <div className="group relative">
       <motion.div className="absolute inset-y-0 right-0 flex items-center justify-end" style={{ width: SWIPE_OPEN, opacity: reveal, pointerEvents: open ? 'auto' : 'none' }}>
         <button className="flex h-full w-[4.5rem] items-center justify-center rounded-[1.25rem] bg-exp text-onbrand" aria-label={label} tabIndex={open ? 0 : -1} onClick={onDelete}><Trash2 size={20} /></button>
       </motion.div>
@@ -241,6 +241,11 @@ function SwipeRow({ children, label, onDelete }: { children: React.ReactNode; la
         className="relative z-10" style={{ x, touchAction: 'pan-y' }} animate={controls} onDragEnd={() => settle(x.get() < -SWIPE_OPEN / 2 ? -SWIPE_OPEN : 0)}>
         {children}
       </motion.div>
+      {/* con il mouse (tablet con tastiera, PC) il cestino compare al passaggio e con il focus: non serve trascinare */}
+      <button type="button" aria-label={label} onClick={onDelete}
+        className="absolute -right-2 -top-2 z-20 hidden h-7 w-7 items-center justify-center rounded-full bg-exp text-onbrand opacity-0 shadow transition focus-visible:opacity-100 group-hover:opacity-100 [@media(hover:hover)]:flex">
+        <Trash2 size={14} />
+      </button>
     </div>
   )
 }

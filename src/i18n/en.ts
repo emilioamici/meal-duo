@@ -442,4 +442,5 @@ export const EN: Record<string, string> = {
   "Hai mangiato tutto quello che avevi in programma.": "You ate everything you had planned.",
   "Il codice basta: chi lo riceve (o apre il link d’invito) entra da solo, senza che tu inserisca la sua email. È un segreto condiviso: chi lo conosce può entrare, e togliere una persona da Drive non basta se ha ancora il codice.": "The code is enough: whoever gets it (or opens the invite link) joins on their own, without you entering their email. It's a shared secret: anyone who knows it can join, and removing someone from Drive isn't enough if they still have the code.",
   "Il codice da solo non basta finché la famiglia non è collegata al server (servono l’accesso persistente e il Worker aggiornato): per ora invita le persone con la loro email, poi daranno il codice o apriranno il link.": "The code alone isn't enough until the family is linked to the server (you need persistent access and the updated Worker): for now invite people by email, then they'll enter the code or open the link.",
+  "Suggerimento: i tasti 1–4 cambiano schermata.": "Tip: keys 1–4 switch screen.",
 }

@@ -26,7 +26,7 @@ export function PantryPanel({ fabOpen }: { fabOpen: boolean }) {
           <EmptyCard mascot={<MascotImg kind="zenitsu-fish" className="mx-auto h-20 w-auto" />} title={t('Dispensa vuota')}
             text={t('Si riempie quando spunti un articolo nella lista della spesa e si svuota quando completi un pasto.')} />
         )}
-        <ul className="space-y-2">
+        <ul className="space-y-2 md:grid md:grid-cols-2 md:gap-2 md:space-y-0 lg:grid-cols-3">
           {list.map((e) => (
             <li key={`${e.foodId}|${e.unit}`}>
               <button className="card flex w-full items-center justify-between gap-3 p-3 text-left active:bg-line/30" onClick={() => setEdit(e)} aria-label={t('Modifica {name} in dispensa', { name: e.name })}>

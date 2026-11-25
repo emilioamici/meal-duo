@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { AnimatePresence, MotionConfig, motion } from 'framer-motion'
-import { Background, BottomNav, Celebration, Toast } from './components/Chrome'
+import { Background, BottomNav, Celebration, SideNav, Toast } from './components/Chrome'
 import { StoreProvider, useStore } from './state/store'
-import { UiProvider, useUi } from './state/ui'
+import { UiProvider, useUi, type Tab } from './state/ui'
 import { TodayView } from './views/TodayView'
 import { WeekView } from './views/WeekView'
 import { ShoppingView } from './views/ShoppingView'
@@ -19,13 +19,28 @@ import { isPristine } from './services/dbOps'
 import { buildShoppingList, shoppingProgress } from './services/shoppingListEngine'
 
 function AppShell() {
-  const { tab } = useUi()
+  const { tab, setTab } = useUi()
   const { db } = useStore()
   const { filters } = useUi()
   const scroller = useRef<HTMLDivElement>(null)
   const [overlay, setOverlay] = useState<HTMLElement | null>(null)
   const hosts = useMemo(() => ({ overlay }), [overlay])
   useEffect(() => { scroller.current?.scrollTo({ top: 0 }) }, [tab])
+
+  // da tastiera (PC): 1–4 cambiano schermata, se non si sta scrivendo e non c'è un foglio aperto
+  useEffect(() => {
+    const order: Tab[] = ['today', 'week', 'shop', 'settings']
+    const onKey = (e: KeyboardEvent) => {
+      if (e.ctrlKey || e.metaKey || e.altKey || e.repeat) return
+      const el = e.target as HTMLElement | null
+      if (el && (el.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName))) return
+      if (document.querySelector('[role="dialog"]')) return
+      const i = ['1', '2', '3', '4'].indexOf(e.key)
+      if (i >= 0) setTab(order[i])
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [setTab])
 
   const badge = useMemo(() => {
     const p = shoppingProgress(db, buildShoppingList(db, filters))
@@ -35,11 +50,13 @@ function AppShell() {
   return (
     <OverlayCtx.Provider value={hosts}>
       <Background />
-      <div className="mx-auto flex h-full max-w-md items-stretch md:items-center">
-        <div className="relative h-full w-full overflow-hidden md:h-[min(52rem,calc(100dvh-2rem))] md:rounded-[2.75rem] md:border md:border-line md:shadow-[0_40px_100px_-20px_rgb(var(--glass-shade))]">
-          <div ref={scroller} className="h-full overflow-y-auto overscroll-contain px-4 pt-safe pb-32">
+      {/* telefono: una colonna con la barra in basso; da 768 px barra laterale e contenuto a tutta larghezza (colonne su schermi larghi) */}
+      <div className="mx-auto flex h-full max-w-md md:max-w-none">
+        <SideNav shopBadge={badge} />
+        <div className="relative h-full min-w-0 flex-1 overflow-hidden">
+          <div ref={scroller} className="h-full overflow-y-auto overscroll-contain px-4 pt-safe pb-32 md:px-8 md:pb-24 lg:px-10">
             <AnimatePresence mode="wait" initial={false}>
-              <motion.div key={tab} className="pt-4"
+              <motion.div key={tab} className="mx-auto w-full max-w-md pt-4 md:max-w-3xl md:pt-6 lg:max-w-6xl"
                 initial={{ opacity: 0, y: 10, filter: 'blur(6px)' }} animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
                 exit={{ opacity: 0, y: -6, filter: 'blur(6px)' }} transition={{ duration: 0.18 }}>
                 {tab === 'today' && <TodayView />}

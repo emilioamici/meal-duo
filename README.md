@@ -164,6 +164,19 @@ Con lo scope `drive.file` Drive nega l'accesso (`404`) ai file creati da altri *
 
 ---
 
+### Telefono, tablet e PC
+Il layout si adatta alla larghezza (breakpoint Tailwind `md` = 768 px, `lg` = 1024 px, `xl` = 1280 px):
+
+| Schermo | Navigazione | Contenuto |
+|---|---|---|
+| **Telefono** (< 768 px) | barra fluttuante in basso | una colonna, come prima |
+| **Tablet** (768–1023 px) | barra laterale stretta (icone con etichetta) | pasti, spesa e dispensa su 2 colonne; i fogli sono finestre centrate |
+| **PC** (≥ 1024 px) | barra laterale larga con il titolo | fino a 3 colonne per i pasti (xl), 2 per spesa e settimana, impostazioni su 2 colonne |
+
+Da **tastiera** i tasti **1–4** cambiano schermata (non mentre si scrive in un campo o con un foglio aperto), `Tab` scorre i comandi con un anello di focus visibile, `Esc` chiude i fogli. Con il **mouse** (anche su tablet con trackpad) il cestino delle righe della spesa compare al passaggio e con il focus: non serve trascinare. La barra di scorrimento torna visibile quando c'è un mouse. Gli screenshot si generano con `npm run e2e` (controlla anche l'assenza di scorrimento orizzontale a 390, 820, 1024 e 1440 px).
+
+---
+
 ## 5. Sincronizzazione, offline e conflitti
 
 **Cache locale.** Il database vive in memoria con una copia in **IndexedDB** (con la versione di Drive a cui corrisponde): l'app parte subito ed è sempre utilizzabile offline.

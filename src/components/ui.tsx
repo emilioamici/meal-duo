@@ -148,8 +148,8 @@ export function Sheet({ open, onClose, title, children, footer }: { open: boolea
             drag="y" dragControls={controls} dragListener={false}
             dragConstraints={{ top: 0, bottom: 0 }} dragElastic={{ top: 0, bottom: 0.6 }}
             onDragEnd={(_, i) => { if (i.offset.y > 120 || i.velocity.y > 600) onClose() }}>
-            <div className="flex shrink-0 cursor-grab touch-none justify-center pb-1 pt-3" onPointerDown={(e) => controls.start(e)}>
-              <div className="h-1.5 w-10 rounded-full bg-muted/50" />
+            <div className="flex shrink-0 cursor-grab touch-none justify-center pb-1 pt-3 md:pt-5" onPointerDown={(e) => controls.start(e)}>
+              <div className="h-1.5 w-10 rounded-full bg-muted/50 md:hidden" />
             </div>
             <div className="flex shrink-0 items-center justify-between px-5 pb-1">
               <h2 className="text-xl font-bold">{title}</h2>
