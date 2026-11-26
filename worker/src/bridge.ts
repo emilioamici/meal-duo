@@ -28,13 +28,13 @@ const WRITE_ROLES = new Set(['owner', 'organizer', 'fileOrganizer', 'writer'])
 
 export const bridgeEnabled = (env: Env): boolean => authConfigured(env)
 
-async function loadHouse(env: Env, fileId: string): Promise<House | null> {
+export async function loadHouse(env: Env, fileId: string): Promise<House | null> {
   const v = await env.SUBS.get(hkey(fileId))
   return v ? unseal<House>(env, v) : null
 }
 
 /** Token d'accesso di chi ha registrato la famiglia. Se Google ha revocato il suo accesso il collegamento si cancella. */
-async function houseToken(env: Env, fileId: string, house: House): Promise<string> {
+export async function houseToken(env: Env, fileId: string, house: House): Promise<string> {
   const r = await fetch(`${oauth(env)}/token`, {
     method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({ refresh_token: house.rt, client_id: env.GOOGLE_CLIENT_ID!, client_secret: env.GOOGLE_CLIENT_SECRET!, grant_type: 'refresh_token' }),

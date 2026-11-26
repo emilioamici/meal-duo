@@ -148,6 +148,33 @@ npx wrangler deploy
 - *Restrizioni delle applicazioni → Siti web*: `https://<utente>.github.io/*` (**origine senza percorso**: il Selettore gira in un iframe di Google e il browser invia solo l'origine; con `…/meal-duo/*` si ottiene proprio questo errore).
 - Con il ponte attivo e il codice, il Selettore non serve: un errore sulla chiave non impedisce di entrare.
 
+## Promemoria dei pasti (a orario o a evento)
+
+Da *Impostazioni → Promemoria pasti* ogni persona può ricevere una notifica «è ora di Pranzo», con gli alimenti del proprio piano, anche con l'app chiusa. Serve il Worker aggiornato e le notifiche attive su quel dispositivo.
+
+**A un orario.** Le regole (pasto, orario, giorni) e il fuso orario del dispositivo stanno nel KV del Worker (`rem:<file>:<email>`): una PWA chiusa non può programmarsi le notifiche, quindi le invia il server. Un **Cron Trigger** si sveglia ogni 5 minuti e invia i promemoria arrivati all'orario (nel fuso dell'utente, calcolato con `Intl` a ogni giro: regge l'ora legale). Se un giro salta, il promemoria parte al successivo (finestra di 10 minuti); un segno per regola e per giorno evita doppioni. Sulla notte del cambio all'ora legale, un orario compreso nell'ora che non esiste (02:00–02:59) quel giorno non scatta.
+
+> **⚠ Dopo aver aggiornato il Worker devi aggiungere il cron a mano.** `wrangler.toml` è una copia locale ignorata da Git: copia queste righe da `wrangler.example.toml` e ripubblica (`npx wrangler deploy`). Senza, gli orari **non partono mai**:
+> ```toml
+> [triggers]
+> crons = ["*/5 * * * *"]
+> ```
+> Il cron scrive un battito (al massimo ogni ora) e l'app avvisa «il server non sta eseguendo gli orari» se non lo vede da 3 ore.
+
+**A un evento** (come Apple Wallet in MoneyDuo). Un'automazione dell'app Comandi dell'iPhone chiama un indirizzo personale: `POST|GET /reminder/in/<token>?meal=Pranzo`. Si crea dalla scheda; il token si vede una sola volta (sul server resta solo l'hash), si rigenera con «Nuovo indirizzo» e si disattiva. Il pasto è un parametro, quindi con lo stesso indirizzo si fanno più automazioni (`?meal=Cena`). La chiamata non porta credenziali del browser né `Origin`; è limitata a 12 all'ora per indirizzo (poi `429`) e risponde **solo con numeri** (`sent`, `failed`, `removed`): l'indirizzo non permette di leggere il piano.
+Quali eventi si possono usare come innesco dipende da iOS e dalle app (non ho verificato che esista un innesco «notifica di Strava»): l'indirizzo funziona con qualsiasi automazione che possa fare «Ottieni contenuti dell'URL».
+
+| Rotta | Chi | Cosa fa |
+|---|---|---|
+| `/reminders/get`, `/reminders/save` | account con accesso al file (token Google) | legge/salva le regole (max 12) |
+| `/reminders/token`, `/reminders/revoke` | idem | crea/rigenera/disattiva l'indirizzo per gli eventi |
+| `/reminders/test` | idem | invia subito il promemoria ai propri dispositivi, con anteprima del testo |
+| `/reminder/in/<token>` | l'automazione dell'iPhone | scatena il promemoria (solo numeri nella risposta) |
+
+**Sicurezza e privacy.** Il cron e l'indirizzo non portano un token Google: prima di mettere il contenuto di un pasto in una notifica il Worker **riverifica con l'accesso di chi ha creato la famiglia** che l'account sia ancora tra le condivisioni del file; se non lo è, non invia nulla e cancella orari e indirizzo. Il piano non si copia mai in KV: si legge dal database solo quando un promemoria scatta. Se la famiglia non è collegata al ponte il testo è generico («Apri Meal Duo…»). Nel KV restano: orari, giorni, fuso orario, testi delle notifiche, l'hash del token e i segni «già inviato oggi» (2 giorni).
+
+**Limiti del piano gratuito.** Il lavoro di ogni giro è limitato (al massimo 40 account e circa 45 operazioni tra KV e rete, sotto il limite di sottorichieste del piano gratuito); se ci sono tanti promemoria insieme, il resto parte al giro successivo. Il cron usa ~290 letture di elenco al giorno e poche scritture (battito orario, un segno per promemoria inviato). Controlla i limiti correnti di Cloudflare per KV e Workers prima di fare affidamento su numeri più alti.
+
 ## Se qualcosa non va
 - **«Origine non autorizzata» (403):** `ALLOWED_ORIGINS` non coincide con l'indirizzo del sito. Correggi `wrangler.toml` e rifai `npx wrangler deploy`.
 - **«Sessione Google non valida» (401):** il token Google è scaduto; tocca *Riconnetti* nell'app e riprova.
