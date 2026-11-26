@@ -164,6 +164,9 @@ Con lo scope `drive.file` Drive nega l'accesso (`404`) ai file creati da altri *
 
 ---
 
+### Promemoria dei pasti
+In *Impostazioni → Promemoria pasti*: una notifica «è ora di Pranzo» (con gli alimenti del tuo piano) **a un orario** (per pasto, con i giorni scelti) oppure **a un evento**, tramite un indirizzo personale che un'automazione dell'app Comandi dell'iPhone può chiamare, come per Apple Wallet in MoneyDuo. Le notifiche le invia il Worker, quindi arrivano anche con l'app chiusa. **Richiede di aggiungere il cron a `wrangler.toml` e ripubblicare il Worker**: istruzioni, sicurezza e limiti in `worker/README.md`.
+
 ### Telefono, tablet e PC
 Il layout si adatta alla larghezza (breakpoint Tailwind `md` = 768 px, `lg` = 1024 px, `xl` = 1280 px):
 

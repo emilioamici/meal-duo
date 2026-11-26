@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from 'react'
-import { Bell, ChevronDown, Cloud, Database, FileJson, Palette, Plus, Search, ShieldCheck, Trash2, Users, Utensils } from 'lucide-react'
+import { AlarmClock, Bell, ChevronDown, Cloud, Database, FileJson, Palette, Plus, Search, ShieldCheck, Trash2, Users, Utensils } from 'lucide-react'
 import { Accordion, ConfirmButton, PageHeader, Sheet } from '../components/ui'
 import { HeaderActions } from '../components/Chrome'
 import { MascotPeek } from '../components/Mascots'
@@ -9,6 +9,7 @@ import type { FoodCatalogItem } from '../types'
 import { deleteFood, foodUsage, keepBoth, liveFoods, mergeFoods, removeVariant, setVariant, updateFood } from '../services/dbOps'
 import { variantsOf } from '../services/variants'
 import { FoodInput } from '../components/FoodInput'
+import { RemindersCard } from '../components/RemindersCard'
 import { CategoryIcon } from '../components/FoodIcon'
 import { toBase } from '../lib/units'
 import { parseDb } from '../services/dbSchema'
@@ -59,6 +60,10 @@ export function SettingsView() {
 
         <Accordion id="notif" title={t('Notifiche')} icon={<Bell size={20} />} summary={prefs.systemNotif || prefs.pushEnabled ? t('Attive su questo dispositivo') : t('Disattivate (solo la campanella)')}>
           <NotificationsCard />
+        </Accordion>
+
+        <Accordion id="reminders" title={t('Promemoria pasti')} icon={<AlarmClock size={20} />} summary={t('A un orario o a un evento (automazione iPhone)')}>
+          <RemindersCard />
         </Accordion>
 
         <Accordion id="catalog" title={t('Catalogo alimenti')} icon={<Utensils size={20} />} summary={t('{n} alimenti condivisi', { n: foods.length })}>

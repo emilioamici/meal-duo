@@ -228,7 +228,7 @@ describe('ponte verso il database', () => {
 
   it('/health: push, auth e bridge', async () => {
     const { env } = setup()
-    expect(await (await worker.fetch(new Request('https://w.example/health'), env)).json()).toEqual({ ok: true, auth: true, push: true, bridge: true })
+    expect(await (await worker.fetch(new Request('https://w.example/health'), env)).json()).toEqual({ ok: true, auth: true, push: true, bridge: true, reminders: true })
     ;(env as any).VAPID_PRIVATE_KEY = ''
     expect(((await (await worker.fetch(new Request('https://w.example/health'), env)).json()) as any).push).toBe(false)
   })

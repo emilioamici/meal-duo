@@ -1,5 +1,6 @@
 import { bridgeAccess, bridgeEnabled, dbMeta, dbRead, dbWrite, houseJoin, houseMine, houseRegister } from './bridge'
 import { bearerOf, verifyToken } from './identity'
+import { remindersGet, remindersIngest, remindersRevoke, remindersSave, remindersTest, remindersToken, runScheduled } from './reminders'
 import { authCallback, authConfigured, authLogout, authRefresh, authStart } from './auth'
 import { sendWebPush, type PushSubscriptionData, type VapidKeys } from './webpush'
 
@@ -130,6 +131,25 @@ async function unsubscribe(env: Env, req: Request): Promise<unknown> {
   return { ok: true }
 }
 
+export interface PushOutcome { sent: number; failed: number; removed: number; codes: number[] }
+
+export const vapidOf = (env: Env): VapidKeys => ({ publicKey: env.VAPID_PUBLIC_KEY, privateKey: env.VAPID_PRIVATE_KEY, subject: env.VAPID_SUBJECT || 'https://example.invalid/' })
+
+/** Invia un messaggio a tutti i dispositivi iscritti di un utente (per quel database) ed elimina quelli scaduti. Condiviso da /notify e dai promemoria. */
+export async function pushToUser(env: Env, fileId: string, email: string, message: { title: string; body: string; tag?: string }): Promise<PushOutcome> {
+  const out: PushOutcome = { sent: 0, failed: 0, removed: 0, codes: [] }
+  const list = await loadSubs(env, fileId, email)
+  const keep: StoredSub[] = []
+  for (const s of list) {
+    const r = await sendWebPush(s, message, vapidOf(env))
+    if (r.status >= 200 && r.status < 300) { out.sent++; keep.push(s) }
+    else if (r.gone) out.removed++
+    else { out.failed++; out.codes.push(r.status); keep.push(s) }
+  }
+  if (keep.length !== list.length) await saveSubs(env, fileId, email, keep)
+  return out
+}
+
 /** Invia una notifica ai dispositivi dei destinatari (che devono essersi iscritti allo stesso database). */
 async function notify(env: Env, req: Request): Promise<unknown> {
   const body = await readJson(req)
@@ -142,35 +162,34 @@ async function notify(env: Env, req: Request): Promise<unknown> {
   const tag = typeof body.tag === 'string' ? body.tag.slice(0, 100) : undefined
   const sender = await authenticate(env, req, body.fileId)
 
-  const vapid: VapidKeys = { publicKey: env.VAPID_PUBLIC_KEY, privateKey: env.VAPID_PRIVATE_KEY, subject: env.VAPID_SUBJECT || 'https://example.invalid/' }
   // chi scrive non riceve la propria notifica, tranne nella prova ("test": true) che può indirizzarsi solo a se stesso
   const targets = body.test === true ? recipients.filter((r) => r === sender) : recipients.filter((r) => r !== sender)
   let sent = 0, failed = 0, removed = 0
   const codes: number[] = []
   for (const email of targets) {
-    const list = await loadSubs(env, body.fileId, email)
-    const keep: StoredSub[] = []
-    for (const s of list) {
-      const r = await sendWebPush(s, { title, body: text, tag }, vapid)
-      if (r.status >= 200 && r.status < 300) { sent++; keep.push(s) }
-      else if (r.gone) removed++
-      else { failed++; codes.push(r.status); keep.push(s) }
-    }
-    if (keep.length !== list.length) await saveSubs(env, body.fileId, email, keep)
+    const r = await pushToUser(env, body.fileId, email, { title, body: text, tag })
+    sent += r.sent; failed += r.failed; removed += r.removed; codes.push(...r.codes)
   }
   return codes.length ? { ok: true, sent, failed, removed, codes } : { ok: true, sent, failed, removed }
 }
 
 export default {
+  /** Cron Trigger (ogni 5 minuti, vedi wrangler.example.toml): invia i promemoria dei pasti arrivati all'orario. */
+  async scheduled(event: { scheduledTime: number }, env: Env): Promise<{ fired: number }> {
+    return runScheduled(env, event.scheduledTime)
+  },
   async fetch(req: Request, env: Env): Promise<Response> {
     const headers = cors(env, req)
     const json = (status: number, data: unknown) => new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json', ...headers } })
     const { pathname } = new URL(req.url)
     if (req.method === 'OPTIONS') return new Response(null, { status: headers['Access-Control-Allow-Origin'] ? 204 : 403, headers })
-    if (pathname === '/health') return json(200, { ok: true, auth: authConfigured(env), push: !!(env.VAPID_PUBLIC_KEY && env.VAPID_PRIVATE_KEY), bridge: bridgeEnabled(env) })
+    if (pathname === '/health') return json(200, { ok: true, auth: authConfigured(env), push: !!(env.VAPID_PUBLIC_KEY && env.VAPID_PRIVATE_KEY), bridge: bridgeEnabled(env), reminders: true })
     // l'accesso persistente passa da due pagine aperte nel browser (GET): Google rimanda qui dopo il consenso
     if (req.method === 'GET' && pathname === '/auth/start') return authStart(env, req)
     if (req.method === 'GET' && pathname === '/auth/callback') return authCallback(env, req)
+    // l'automazione dell'iPhone chiama qui con il token personale nell'indirizzo (GET o POST): nessuna origine del browser
+    const trigger = /^\/reminder\/in\/([\w-]{20,100})$/.exec(pathname)
+    if (trigger && (req.method === 'POST' || req.method === 'GET')) { const r = await remindersIngest(env, req, trigger[1]); return new Response(JSON.stringify(r.body), { status: r.status, headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' } }) }
     if (req.method !== 'POST') return json(404, { error: 'Non trovato' })
     // le chiamate dal browser devono arrivare da un'origine autorizzata
     if (!headers['Access-Control-Allow-Origin']) return json(403, { error: 'Origine non autorizzata' })
@@ -179,6 +198,11 @@ export default {
       if (pathname === '/unsubscribe') return json(200, await unsubscribe(env, req))
       if (pathname === '/notify') return json(200, await notify(env, req))
       if (pathname === '/house/register') return json(200, await houseRegister(env, req))
+      if (pathname === '/reminders/get') return json(200, await remindersGet(env, req))
+      if (pathname === '/reminders/save') return json(200, await remindersSave(env, req))
+      if (pathname === '/reminders/test') return json(200, await remindersTest(env, req))
+      if (pathname === '/reminders/token') return json(200, await remindersToken(env, req))
+      if (pathname === '/reminders/revoke') return json(200, await remindersRevoke(env, req))
       if (pathname === '/house/join') return json(200, await houseJoin(env, req))
       if (pathname === '/house/mine') return json(200, await houseMine(env, req))
       if (pathname === '/db/meta') return json(200, await dbMeta(env, req))

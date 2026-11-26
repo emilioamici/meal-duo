@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# End-to-end: condivisione del database e layout responsive.
+# End-to-end: condivisione del database, layout responsive e promemoria dei pasti.
 # Condivisione: Playwright (Chromium) contro l'app compilata, con Google, Drive e Worker simulati.
 # Non è tra i test di `npm test` perché serve un browser: `npm run e2e` (richiede `playwright` installato, anche globale).
 set -euo pipefail
@@ -15,3 +15,4 @@ sleep 2
 export NODE_PATH="${NODE_PATH:-$(npm root -g)}"
 node e2e/share.e2e.cjs
 node e2e/responsive.e2e.cjs
+node e2e/reminders.e2e.cjs

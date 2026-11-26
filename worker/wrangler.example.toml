@@ -13,6 +13,11 @@ VAPID_SUBJECT = "https://<utente>.github.io/meal-duo/"
 # Il client secret e SESSION_KEY NON vanno qui: si impostano con `npx wrangler secret put` (vedi README).
 # GOOGLE_CLIENT_ID = "xxxx.apps.googleusercontent.com"
 
+# Promemoria dei pasti a orario: il Worker si sveglia ogni 5 minuti e invia le notifiche arrivate all'orario.
+# SENZA queste due righe gli orari non partono mai (l'app avvisa se il server non li sta eseguendo).
+[triggers]
+crons = ["*/5 * * * *"]
+
 [[kv_namespaces]]
 binding = "SUBS"
 id = "INSERISCI_QUI_L_ID_DEL_KV"
